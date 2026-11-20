@@ -14,11 +14,11 @@ set -euo pipefail
 cd /home/hice1/nparikh44/scratch/conv-ai-project
 mkdir -p results
 
-# Sync GPU dependencies first if not already synced (uv sync --extra gpu)
+# Sync dependencies first if not already synced (uv sync)
 export PATH="$HOME/.local/bin:$PATH"
 
-uv run --extra gpu python scripts/run_experiment.py \
-  --mode hf \
+uv run python scripts/run_experiment.py \
+  --mode vllm \
   --model_name Qwen/Qwen2.5-3B-Instruct \
   --split dev \
   --target_turns 48 \

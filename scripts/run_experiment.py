@@ -16,7 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.controllers import make_controller
 from src.data import build_sample_fdb_v2_dataset, load_traces
-from src.engine import CalibratedMockEngine, HuggingFaceGPUEngine
+from src.engine import CalibratedMockEngine, VLLMEngine
 from src.simulator import (
     DEFAULT_LOAD_RATES_RPS,
     ReplayHarness,
@@ -75,9 +75,8 @@ def _format_table(summaries: Sequence[RunSummary]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run shared-GPU early-draft experiments.")
-    parser.add_argument("--mode", choices=["mock", "hf"], default="mock")
+    parser.add_argument("--mode", choices=["mock", "vllm"], default="mock")
     parser.add_argument("--model_name", default="Qwen/Qwen2.5-3B-Instruct")
-    parser.add_argument("--device", default="cuda")
     parser.add_argument("--dtype", default="bfloat16")
     parser.add_argument("--data_dir", default=str(PROJECT_ROOT / "data" / "fdb_v2_sample"))
     parser.add_argument("--split", choices=["dev", "held_out"], default="dev")
@@ -103,10 +102,9 @@ def main() -> None:
     if args.mode == "mock":
         engine = CalibratedMockEngine()
     else:
-        print(f"Loading HuggingFaceGPUEngine ({args.model_name} on {args.device}) ...")
-        engine = HuggingFaceGPUEngine(
+        print(f"Loading VLLMEngine ({args.model_name}, dtype={args.dtype}) ...")
+        engine = VLLMEngine(
             model_name=args.model_name,
-            device=args.device,
             dtype=args.dtype,
         )
 

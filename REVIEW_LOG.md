@@ -7,7 +7,7 @@ Items identified while walking through the infrastructure files one by one.
 ## Pending & Completed Improvements
 
 - **[x] Warmup handling (`scripts/run_experiment.py`, `src/engine/`, `src/simulator/harness.py`)**
-  - **Engine warmup (`engine.warmup()`):** Added `warmup()` on `BaseLLMEngine` (no-op on `CalibratedMockEngine`; dummy prefill, batched decode, and verification passes on `HuggingFaceGPUEngine`) and invoked it once after loading the engine in `scripts/run_experiment.py`.
+  - **Engine warmup (`engine.warmup()`):** Added `warmup()` on `BaseLLMEngine` (no-op on `CalibratedMockEngine`; dummy prefill, batched decode, and verification passes on `VLLMEngine`) and invoked it once after loading the engine in `scripts/run_experiment.py`.
   - **Workload queue & controller warmup (`--warmup_turns`):** Added `--warmup_turns` (default `6`) in `scripts/run_experiment.py` and `warmup_turns` / `is_warmup` in `ReplayHarness` (`src/simulator/harness.py`), marking the first $W$ turns `is_warmup=True` in turn-level JSONL logs and computing summary metrics over steady-state turns.
 
 - **[ ] P1 prefill isolation vs. interleaving (`src/scheduler/gateway.py`)**
@@ -18,10 +18,8 @@ Items identified while walking through the infrastructure files one by one.
   - Simplified `ConversationState` to hold raw observations (`previous_partial_text`, `current_partial_text`, `partial_history`, `active_draft_tokens`, `accepted_draft_ema`).
   - Moved `is_revised(conv_state)` and `readiness_score(conv_state)` as default overridable methods onto `BaseController`, and added `discard_existing_draft: bool = False` to `DraftDecision` so `PriorityGateway` obeys controller decisions without inspecting revision cues directly.
 
-- **[x] Standard ML systems GPU serving practices (`src/engine/hf_engine.py`)**
-  - **True batched GPU `decode_step`:** Added left-padded batched decoding across all live `P0` + `P1` sequences in a single `self.model(...)` forward pass, unpadding updated per-sequence KV caches afterward.
-  - **Invariant history / longest-common-prefix KV reuse:** Added LRU `_prefix_cache` per conversation with immutable KV cloning/cropping (`_clone_and_crop_kv`) so `prefill_prompt` and `verify_and_prefill_final` reuse unchanged prompt prefix KV states and recompute only the changed suffix + draft tokens.
-  - **CUDA event timing:** Added `_timed_forward` using `torch.cuda.Event(enable_timing=True)` on CUDA devices with `time.perf_counter()` fallback on CPU.
+- **[x] Standard ML systems GPU serving practices (`src/engine/vllm_engine.py`)**
+  - Replaced the custom PyTorch KV-cache batching engine with `VLLMEngine` backed by `vllm` (`enable_prefix_caching=True`, continuous batched `decode_step`, and parallel `prompt_logprobs=1` draft verification).
 
 - **[x] Dataset & streaming trace realism (`src/data/builder.py`, `src/controllers/base.py`)**
   - **Semantic revisions over synthetic ASR jitter:** Removed `compute_prefix_rewrite_distance` (which targeted ASR word-overwrite jitter rather than speaker self-corrections), keeping `detect_revision_cue` focused on mid-utterance semantic pivots on committed/monotonic streaming transcripts.

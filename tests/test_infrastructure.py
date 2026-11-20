@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import contextlib
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-
-import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -33,7 +30,7 @@ from src.data import (
 )
 from src.engine import (
     CalibratedMockEngine,
-    HuggingFaceGPUEngine,
+    VLLMEngine,
     find_first_sentence_token_index,
     verify_draft_prefix,
 )
@@ -298,113 +295,9 @@ class TestInfrastructure(unittest.TestCase):
         gw.on_partial_arrive("conv_h", 0, [], "Book a flight RETRACT Miami", 0.0, 500.0)
         self.assertEqual(len(gw.conversations["conv_h"].active_draft_tokens), 0)
 
-    def test_hf_engine_batched_decode_prefix_reuse_and_warmup(self) -> None:
-        class _StubTensor:
-            def __init__(self, arr: np.ndarray) -> None:
-                self.arr = np.asarray(arr)
-
-            @property
-            def shape(self):
-                return self.arr.shape
-
-            @property
-            def dtype(self):
-                return self.arr.dtype
-
-            @property
-            def device(self):
-                return "cuda:0"
-
-            def __getitem__(self, item):
-                out = self.arr[item]
-                return _StubTensor(out) if isinstance(out, np.ndarray) else out
-
-            def __setitem__(self, key, value) -> None:
-                val = value.arr if isinstance(value, _StubTensor) else value
-                self.arr[key] = val
-
-            def clone(self):
-                return _StubTensor(self.arr.copy())
-
-            def contiguous(self):
-                return self
-
-            def unsqueeze(self, dim: int):
-                return _StubTensor(np.expand_dims(self.arr, axis=dim))
-
-            def argmax(self, dim: int = -1):
-                return _StubTensor(np.argmax(self.arr, axis=dim))
-
-            def item(self):
-                return self.arr.item()
-
-            def tolist(self):
-                return self.arr.tolist()
-
-        class _StubDynamicCache:
-            def __init__(self) -> None:
-                self.key_cache = []
-                self.value_cache = []
-
-            def update(self, k, v, layer_idx: int) -> None:
-                if layer_idx < len(self.key_cache):
-                    self.key_cache[layer_idx] = _StubTensor(
-                        np.concatenate([self.key_cache[layer_idx].arr, k.arr], axis=2)
-                    )
-                    self.value_cache[layer_idx] = _StubTensor(
-                        np.concatenate([self.value_cache[layer_idx].arr, v.arr], axis=2)
-                    )
-                else:
-                    self.key_cache.append(k)
-                    self.value_cache.append(v)
-
-        class _StubCudaEvent:
-            def __init__(self, enable_timing: bool = True) -> None:
-                self.t = 0.0
-
-            def record(self) -> None:
-                self.t = 1.0
-
-            def elapsed_time(self, other) -> float:
-                return 3.25
-
-        class _StubTorch:
-            long = np.int64
-
-            class cuda:
-                @staticmethod
-                def is_available() -> bool:
-                    return True
-
-                @staticmethod
-                def synchronize() -> None:
-                    return None
-
-                Event = _StubCudaEvent
-
-            @staticmethod
-            def no_grad():
-                return contextlib.nullcontext()
-
-            @staticmethod
-            def tensor(data, dtype=None, device=None):
-                return _StubTensor(np.array(data, dtype=dtype or np.int64))
-
-            @staticmethod
-            def ones(shape, dtype=None, device=None):
-                return _StubTensor(np.ones(shape, dtype=dtype or np.int64))
-
-            @staticmethod
-            def zeros(shape, dtype=None, device=None):
-                return _StubTensor(np.zeros(shape, dtype=dtype or np.float32))
-
-            @staticmethod
-            def arange(start, end, dtype=None, device=None):
-                return _StubTensor(np.arange(start, end, dtype=dtype or np.int64))
-
+    def test_vllm_engine_verification_batched_decode_and_warmup(self) -> None:
         class _StubTokenizer:
             eos_token_id = 0
-            pad_token_id = 0
 
             def encode(self, text: str, add_special_tokens: bool = True):
                 return [((sum(ord(c) for c in w) % 20) + 5) for w in text.split()]
@@ -412,134 +305,84 @@ class TestInfrastructure(unittest.TestCase):
             def decode(self, ids, skip_special_tokens: bool = True) -> str:
                 return " ".join(str(i) for i in ids)
 
-        class _StubModel:
+        class _StubSamplingParams:
+            def __init__(self, temperature: float = 0.0, max_tokens: int = 1, prompt_logprobs=None):
+                self.temperature = temperature
+                self.max_tokens = max_tokens
+                self.prompt_logprobs = prompt_logprobs
+
+        class _StubLLM:
             def __init__(self) -> None:
+                self._tok = _StubTokenizer()
                 self.calls = []
-                self.vocab_size = 64
-                self.num_heads = 2
-                self.head_dim = 4
 
-            def __call__(
-                self,
-                input_ids,
-                attention_mask=None,
-                position_ids=None,
-                past_key_values=None,
-                use_cache: bool = True,
-            ):
-                bsz, seq_len = input_ids.shape
-                past_len = (
-                    past_key_values.key_cache[0].shape[2]
-                    if past_key_values is not None and past_key_values.key_cache
-                    else 0
-                )
-                self.calls.append((bsz, seq_len, past_len))
+            def get_tokenizer(self):
+                return self._tok
 
-                cache = _StubDynamicCache()
-                if past_key_values is not None and past_key_values.key_cache:
-                    cache.key_cache = [k.clone() for k in past_key_values.key_cache]
-                    cache.value_cache = [v.clone() for v in past_key_values.value_cache]
+            @staticmethod
+            def _next_tok(prefix_ids):
+                return ((sum(prefix_ids) + len(prefix_ids) * 7) % 25) + 10
 
-                k_new = np.zeros((bsz, self.num_heads, seq_len, self.head_dim), dtype=np.float32)
-                v_new = np.zeros((bsz, self.num_heads, seq_len, self.head_dim), dtype=np.float32)
-                logits = np.zeros((bsz, seq_len, self.vocab_size), dtype=np.float32)
-
-                for b in range(bsz):
-                    for s in range(seq_len):
-                        pos = (
-                            int(position_ids[b, s])
-                            if position_ids is not None
-                            else past_len + s
+            def generate(self, prompts, sampling_params, use_tqdm: bool = False):
+                self.calls.append((len(prompts), sampling_params.prompt_logprobs))
+                results = []
+                for p in prompts:
+                    ids = list(p["prompt_token_ids"])
+                    prompt_lps = None
+                    if sampling_params.prompt_logprobs:
+                        prompt_lps = [None] + [
+                            {self._next_tok(ids[:i]): SimpleNamespace(rank=1, logprob=-0.1)}
+                            for i in range(1, len(ids))
+                        ]
+                    cur = list(ids)
+                    out_toks = []
+                    for _ in range(sampling_params.max_tokens):
+                        nxt = self._next_tok(cur)
+                        out_toks.append(nxt)
+                        cur.append(nxt)
+                    results.append(
+                        SimpleNamespace(
+                            outputs=[SimpleNamespace(token_ids=out_toks)],
+                            prompt_logprobs=prompt_lps,
                         )
-                        tok = int(input_ids[b, s])
-                        k_new[b, :, s, :] = float(tok + pos)
-                        v_new[b, :, s, :] = float(tok * 2 + pos)
+                    )
+                return results
 
-                cache.update(_StubTensor(k_new), _StubTensor(v_new), 0)
-                k_all = cache.key_cache[0].arr
-                for b in range(bsz):
-                    for s in range(seq_len):
-                        pos = (
-                            int(position_ids[b, s])
-                            if position_ids is not None
-                            else past_len + s
-                        )
-                        tok = int(input_ids[b, s])
-                        upto = past_len + s + 1
-                        k_slice = k_all[b, 0, :upto, 0]
-                        if attention_mask is not None:
-                            m_slice = attention_mask.arr[b, :upto]
-                            attn_sum = int(np.sum(k_slice * m_slice))
-                        else:
-                            attn_sum = int(np.sum(k_slice))
-                        pred = ((tok * 3 + pos * 5 + attn_sum) % 30) + 10
-                        logits[b, s, pred] = 10.0
+        stub_llm = _StubLLM()
+        engine = VLLMEngine(llm=stub_llm, sampling_params_cls=_StubSamplingParams)
 
-                return SimpleNamespace(logits=_StubTensor(logits), past_key_values=cache)
-
-        stub_model = _StubModel()
-        engine = HuggingFaceGPUEngine(
-            device="cuda",
-            model=stub_model,
-            tokenizer=_StubTokenizer(),
-            torch_module=_StubTorch(),
-        )
-        engine._dynamic_cache_cls = _StubDynamicCache
-
-        # 1. Warmup runs without error and leaves prefix cache clean
         engine.warmup(num_passes=1)
-        self.assertEqual(len(engine._prefix_cache), 0)
-        stub_model.calls.clear()
+        self.assertGreaterEqual(len(stub_llm.calls), 3)
+        stub_llm.calls.clear()
 
-        # 2. Prefix KV-cache reuse skips recomputing shared tokens
-        seq_p1, t_p1 = engine.prefill_prompt("conv1:t0:v1", [], "book table for", True)
-        self.assertEqual(t_p1, 3.25)  # CUDA event timing used
-        full_len_1 = seq_p1.prompt_tokens_len
-        self.assertEqual(stub_model.calls[-1], (1, full_len_1, 0))
+        # Draft 3 tokens for prompt, then verify exact match vs partial mismatch
+        seq_a, _ = engine.prefill_prompt("conv1:t0:v1", [], "book a table for two", False)
+        engine.decode_step([seq_a])
+        engine.decode_step([seq_a])
+        draft = list(seq_a.generated_tokens)
+        self.assertEqual(len(draft), 3)
 
-        seq_p2, _ = engine.prefill_prompt(
-            "conv1:t0:v2", [], "book table for two at seven", True
+        ver_full, seq_full = engine.verify_and_prefill_final(
+            "conv1:t0:final", [], "book a table for two", draft_tokens=draft
         )
-        # Reuses all tokens of partial 1 (min(lcp, full_len_2 - 1))
-        bsz2, suffix_len2, past_len2 = stub_model.calls[-1]
-        self.assertEqual(bsz2, 1)
-        self.assertGreater(past_len2, 0)
-        self.assertEqual(past_len2 + suffix_len2, seq_p2.prompt_tokens_len)
+        self.assertEqual(ver_full.accepted_count, 3)
+        self.assertIsNotNone(ver_full.bonus_token)
+        self.assertEqual(len(seq_full.generated_tokens), 4)
 
-        # 3. Verify matches uncached full-prompt prediction
-        ver_res, seq_final = engine.verify_and_prefill_final(
-            "conv1:t0:final",
-            [],
-            "book table for two at seven",
-            draft_tokens=seq_p2.generated_tokens,
+        ver_partial, _ = engine.verify_and_prefill_final(
+            "conv1:t0:final2", [], "book a table for two", draft_tokens=[draft[0], 999, draft[2]]
         )
-        self.assertEqual(ver_res.accepted_count, 1)
-        self.assertIsNotNone(ver_res.bonus_token)
+        self.assertEqual(ver_partial.accepted_count, 1)
+        self.assertEqual(ver_partial.bonus_token, draft[1])
 
-        # 4. Batched decode across 2 sequences of unequal lengths uses 1 single forward pass
-        seq_other, _ = engine.prefill_prompt(
-            "conv2:t0:v1", [], "hi", False
-        )
-        self.assertNotEqual(
-            seq_final.backend_state.total_seq_len,
-            seq_other.backend_state.total_seq_len,
-        )
-        stub_model.calls.clear()
-        emitted, batch_ms = engine.decode_step([seq_final, seq_other])
-        self.assertEqual(batch_ms, 3.25)
-        self.assertEqual(len(stub_model.calls), 1)
-        self.assertEqual(stub_model.calls[0][0], 2)  # Single batched forward call (B=2)
+        # Batched decode runs multiple active sequences in one generate() batch
+        seq_b, _ = engine.prefill_prompt("conv2:t0:v1", [], "hello there", True)
+        stub_llm.calls.clear()
+        emitted, _ = engine.decode_step([seq_full, seq_b])
+        self.assertEqual(len(stub_llm.calls), 1)
+        self.assertEqual(stub_llm.calls[0][0], 2)
         self.assertIsNotNone(emitted[0])
         self.assertIsNotNone(emitted[1])
-        # Unpadded per-sequence KV caches stay at exact expected lengths
-        self.assertEqual(
-            seq_final.backend_state.past_key_values.key_cache[0].shape[2],
-            seq_final.backend_state.total_seq_len,
-        )
-        self.assertEqual(
-            seq_other.backend_state.past_key_values.key_cache[0].shape[2],
-            seq_other.backend_state.total_seq_len,
-        )
 
 
 if __name__ == "__main__":
