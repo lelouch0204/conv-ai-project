@@ -1,0 +1,228 @@
+{
+  "dev": [
+    {
+      "family": "daily",
+      "turns": [
+        {
+          "user": "Can you recommend a quiet coffee shop near campus with reliable WiFi for studying?",
+          "assistant": "Try Blue Donkey Coffee or Revelator nearby; both offer steady WiFi and quiet seating."
+        },
+        {
+          "user": "Do either of them stay open past nine on weekday evenings so I can finish a report?",
+          "assistant": "Blue Donkey closes at eight, while Revelator stays open until nine thirty on weekdays."
+        }
+      ]
+    },
+    {
+      "family": "daily",
+      "turns": [
+        {
+          "user": "What is a quick high protein breakfast I can make in under ten minutes before class?",
+          "assistant": "Scrambled eggs with spinach on whole grain toast takes about seven minutes."
+        },
+        {
+          "user": "Could you give me a dairy free variation using pantry ingredients?",
+          "assistant": "You can make a chickpea flour scramble with olive oil and nutritional yeast."
+        }
+      ]
+    },
+    {
+      "family": "daily",
+      "turns": [
+        {
+          "user": "Explain the difference between throughput and tail latency in simple everyday terms.",
+          "assistant": "Throughput is how many customers clear checkout per hour; tail latency is the slowest line wait."
+        }
+      ]
+    },
+    {
+      "family": "daily",
+      "turns": [
+        {
+          "user": "Give me three polite ways to decline a meeting invitation when my calendar is already full.",
+          "assistant": "You can offer an alternative slot, request an async summary, or delegate to a teammate."
+        },
+        {
+          "user": "Draft a short two sentence reply I can send to my manager using the second option.",
+          "assistant": "Thanks for including me, though my afternoon is booked. Could you share notes afterward?"
+        }
+      ]
+    },
+    {
+      "family": "correction",
+      "turns": [
+        {
+          "pre_revision_prefix": "Book a conference room for four people at two pm tomorrow",
+          "user": "Book a conference room for four people at two pm tomorrow wait no make it six people at three thirty pm.",
+          "assistant": "I have noted a room request for six people tomorrow at three thirty pm."
+        },
+        {
+          "pre_revision_prefix": "Send the calendar invite to marketing and finance",
+          "user": "Send the calendar invite to marketing and finance actually scratch finance and add product design instead.",
+          "assistant": "Updated the invite recipients to marketing and product design."
+        }
+      ]
+    },
+    {
+      "family": "correction",
+      "turns": [
+        {
+          "pre_revision_prefix": "Find direct flights from Atlanta to Chicago leaving Friday morning",
+          "user": "Find direct flights from Atlanta to Chicago leaving Friday morning sorry I meant Boston on Thursday evening.",
+          "assistant": "Searching nonstop flights from Atlanta to Boston for Thursday evening."
+        }
+      ]
+    },
+    {
+      "family": "correction",
+      "turns": [
+        {
+          "pre_revision_prefix": "Set a daily alarm for six fifteen am on weekdays",
+          "user": "Set a daily alarm for six fifteen am on weekdays wait actually make it seven am Monday through Thursday.",
+          "assistant": "Set a recurring seven am alarm for Monday through Thursday."
+        }
+      ]
+    },
+    {
+      "family": "entity_tracking",
+      "turns": [
+        {
+          "user": "Remember that my dog is named Milo and he is allergic to chicken and beef treats.",
+          "assistant": "Got it, Milo is allergic to chicken and beef treats."
+        },
+        {
+          "user": "Also note that our vet Dr Patel moved her clinic to Oakwood Avenue last month.",
+          "assistant": "Noted that Dr Patel's clinic is now on Oakwood Avenue."
+        },
+        {
+          "user": "Which protein snack and clinic street address should I check before Milo's checkup?",
+          "assistant": "Choose salmon or duck treats instead of chicken or beef, and visit Oakwood Avenue."
+        }
+      ]
+    },
+    {
+      "family": "entity_tracking",
+      "turns": [
+        {
+          "user": "We have three servers named Atlas running Ubuntu, Boreas running Debian, and Cygnus running Rocky.",
+          "assistant": "Recorded the operating systems for Atlas, Boreas, and Cygnus."
+        },
+        {
+          "user": "Which host should receive the apt security patch first if Boreas is offline for maintenance?",
+          "assistant": "None of the online hosts use apt right now because Boreas is the only Debian node."
+        }
+      ]
+    }
+  ],
+  "held_out": [
+    {
+      "family": "daily",
+      "turns": [
+        {
+          "user": "Summarize why regular sleep schedules improve memory consolidation during exam week.",
+          "assistant": "Consistent sleep stabilizes deep and REM stages where newly learned facts integrate."
+        },
+        {
+          "user": "Suggest a realistic wind down routine starting thirty minutes before bedtime.",
+          "assistant": "Dim screens, prep tomorrow's checklist, and read a non-work book for twenty minutes."
+        }
+      ]
+    },
+    {
+      "family": "daily",
+      "turns": [
+        {
+          "user": "How do I safely back up a large research folder to an external drive using rsync?",
+          "assistant": "Use rsync with archive and dry-run flags first to verify file paths before copying."
+        },
+        {
+          "user": "Should I exclude temporary checkpoint directories to save space on the drive?",
+          "assistant": "Yes, pass exclude patterns for temporary checkpoints while keeping final artifacts."
+        }
+      ]
+    },
+    {
+      "family": "daily",
+      "turns": [
+        {
+          "user": "What are two good indoor activities in town when heavy rain cancels a weekend hike?",
+          "assistant": "Visit the botanical conservatory or spend an afternoon at the local science museum."
+        }
+      ]
+    },
+    {
+      "family": "daily",
+      "turns": [
+        {
+          "user": "Help me structure a clear five minute lightning talk about distributed caching.",
+          "assistant": "Spend one minute on the problem, two on design tradeoffs, one on metrics, and one on takeaways."
+        }
+      ]
+    },
+    {
+      "family": "correction",
+      "turns": [
+        {
+          "pre_revision_prefix": "Order two medium vegetarian pizzas for delivery to North Avenue",
+          "user": "Order two medium vegetarian pizzas for delivery to North Avenue wait no change that to three large mushroom pizzas.",
+          "assistant": "Updated order summary to three large mushroom pizzas for North Avenue."
+        },
+        {
+          "pre_revision_prefix": "Schedule the delivery for six pm sharp",
+          "user": "Schedule the delivery for six pm sharp actually push it back to seven fifteen pm instead.",
+          "assistant": "Rescheduled delivery time to seven fifteen pm."
+        }
+      ]
+    },
+    {
+      "family": "correction",
+      "turns": [
+        {
+          "pre_revision_prefix": "Reserve an economy rental car at Denver airport for Tuesday",
+          "user": "Reserve an economy rental car at Denver airport for Tuesday sorry I meant an all wheel drive SUV for Wednesday.",
+          "assistant": "Switched reservation search to an all wheel drive SUV in Denver for Wednesday."
+        }
+      ]
+    },
+    {
+      "family": "correction",
+      "turns": [
+        {
+          "pre_revision_prefix": "Translate this thank you note into Spanish for our Berlin partner",
+          "user": "Translate this thank you note into Spanish for our Berlin partner wait I meant German of course.",
+          "assistant": "Sure, translating your thank you note into German for the Berlin partner."
+        }
+      ]
+    },
+    {
+      "family": "entity_tracking",
+      "turns": [
+        {
+          "user": "Keep track that Sarah handles hardware orders, Devon owns the budget sheet, and Priya leads QA.",
+          "assistant": "Got it: Sarah for hardware, Devon for budget, and Priya for QA."
+        },
+        {
+          "user": "Sarah is out on Friday so Devon will temporarily approve urgent sensor purchases.",
+          "assistant": "Noted that Devon is covering Sarah's urgent sensor approvals on Friday."
+        },
+        {
+          "user": "Who should I message on Friday for a sensor purchase sign off and final test sign off?",
+          "assistant": "Message Devon for the urgent sensor purchase and Priya for final QA test sign off."
+        }
+      ]
+    },
+    {
+      "family": "entity_tracking",
+      "turns": [
+        {
+          "user": "Our lab locker codes are blue for optics, green for microphones, and amber for batteries.",
+          "assistant": "Recorded locker colors for optics, microphones, and batteries."
+        },
+        {
+          "user": "If I need a condenser mic and spare lithium cells, which two lockers do I open?",
+          "assistant": "Open the green locker for microphones and the amber locker for batteries."
+        }
+      ]
+    }
+  ]
+}
