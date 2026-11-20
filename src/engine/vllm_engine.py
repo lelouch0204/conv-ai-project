@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from src.engine.base import (
     ActiveSequenceState,
@@ -24,7 +24,7 @@ class VLLMEngine(BaseLLMEngine):
 
     def __init__(
         self,
-        model_name: str = "Qwen/Qwen2.5-3B-Instruct",
+        model_name: str = "microsoft/Phi-4-mini-instruct",
         dtype: str = "bfloat16",
         gpu_memory_utilization: float = 0.90,
         max_model_len: int = 4096,
@@ -48,7 +48,35 @@ class VLLMEngine(BaseLLMEngine):
         self.llm = llm
         self._sampling_params_cls = sampling_params_cls
         self.tokenizer = self.llm.get_tokenizer()
-        self.eos_token_id = self.tokenizer.eos_token_id
+        self.eos_token_id = getattr(self.tokenizer, "eos_token_id", None)
+        self.stop_token_ids: Set[int] = self._collect_stop_token_ids()
+
+    def _collect_stop_token_ids(self) -> Set[int]:
+        stop_ids: Set[int] = set()
+        if self.eos_token_id is not None:
+            stop_ids.add(int(self.eos_token_id))
+
+        # Inspect HuggingFace / generation configs on vLLM if exposed
+        engine_obj = getattr(self.llm, "llm_engine", None)
+        model_cfg = getattr(engine_obj, "model_config", None)
+        for cfg in (
+            getattr(model_cfg, "hf_config", None),
+            getattr(model_cfg, "generation_config", None),
+        ):
+            eos_val = getattr(cfg, "eos_token_id", None)
+            if isinstance(eos_val, int):
+                stop_ids.add(eos_val)
+            elif isinstance(eos_val, (list, tuple, set)):
+                stop_ids.update(int(x) for x in eos_val if isinstance(x, int))
+
+        # Collect standard chat turn-end tokens if present in tokenizer vocabulary
+        unk_id = getattr(self.tokenizer, "unk_token_id", None)
+        if hasattr(self.tokenizer, "convert_tokens_to_ids"):
+            for tok_str in ("<|end|>", "<|eot_id|>", "<|im_end|>", "<|endoftext|>", "</s>"):
+                tid = self.tokenizer.convert_tokens_to_ids(tok_str)
+                if isinstance(tid, int) and tid >= 0 and tid != unk_id:
+                    stop_ids.add(tid)
+        return stop_ids
 
     def _format_prompt_ids(
         self,
@@ -118,8 +146,9 @@ class VLLMEngine(BaseLLMEngine):
         params = self._sampling_params_cls(temperature=0.0, max_tokens=1)
         outputs, elapsed_ms = self._timed_generate([{"prompt_token_ids": prompt_ids}], params)
 
-        first_tok = int(outputs[0].outputs[0].token_ids[0])
-        hit_eos = first_tok == self.eos_token_id
+        out_toks = outputs[0].outputs[0].token_ids
+        first_tok = int(out_toks[0]) if out_toks else None
+        hit_eos = first_tok is None or first_tok in self.stop_token_ids
         generated = [] if hit_eos else [first_tok]
         context_ids = prompt_ids if hit_eos else (prompt_ids + [first_tok])
 
@@ -165,19 +194,24 @@ class VLLMEngine(BaseLLMEngine):
             pos = prompt_len + idx
             lp_entry = prompt_lps[pos] if pos < len(prompt_lps) else None
             greedy_tok = self._extract_greedy_prompt_token(lp_entry)
-            if greedy_tok is not None and d_tok == greedy_tok and d_tok != self.eos_token_id:
+            if (
+                greedy_tok is not None
+                and d_tok == greedy_tok
+                and d_tok not in self.stop_token_ids
+            ):
                 accepted_count += 1
             else:
                 mismatched_greedy = greedy_tok
                 break
 
         accepted_tokens = draft_ids[:accepted_count]
+        out_toks = req_out.outputs[0].token_ids
         if accepted_count < len(draft_ids) and mismatched_greedy is not None:
-            bonus_raw = mismatched_greedy
+            bonus_raw: Optional[int] = mismatched_greedy
         else:
-            bonus_raw = int(req_out.outputs[0].token_ids[0])
+            bonus_raw = int(out_toks[0]) if out_toks else None
 
-        hit_eos = bonus_raw == self.eos_token_id
+        hit_eos = bonus_raw is None or bonus_raw in self.stop_token_ids
         bonus_token = None if hit_eos else bonus_raw
 
         validated = list(accepted_tokens)
@@ -229,8 +263,12 @@ class VLLMEngine(BaseLLMEngine):
 
         for (orig_idx, seq), out in zip(live, outputs):
             backend = seq.backend_state
-            next_tok = int(out.outputs[0].token_ids[0])
-            if next_tok == self.eos_token_id:
+            out_toks = out.outputs[0].token_ids
+            if not out_toks:
+                seq.finished = True
+                continue
+            next_tok = int(out_toks[0])
+            if next_tok in self.stop_token_ids:
                 seq.finished = True
                 continue
             seq.generated_tokens.append(next_tok)
@@ -256,6 +294,7 @@ class VLLMEngine(BaseLLMEngine):
         params = self._sampling_params_cls(temperature=0.0, max_tokens=max_new_tokens)
         outputs, _ = self._timed_generate([{"prompt_token_ids": prompt_ids}], params)
         gen_ids = [int(t) for t in outputs[0].outputs[0].token_ids]
-        if self.eos_token_id in gen_ids:
-            gen_ids = gen_ids[: gen_ids.index(self.eos_token_id)]
+        for idx, tok in enumerate(gen_ids):
+            if tok in self.stop_token_ids:
+                return gen_ids[:idx]
         return gen_ids

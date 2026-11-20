@@ -298,6 +298,10 @@ class TestInfrastructure(unittest.TestCase):
     def test_vllm_engine_verification_batched_decode_and_warmup(self) -> None:
         class _StubTokenizer:
             eos_token_id = 0
+            unk_token_id = -1
+
+            def convert_tokens_to_ids(self, tok: str) -> int:
+                return 99 if tok == "<|end|>" else -1
 
             def encode(self, text: str, add_special_tokens: bool = True):
                 return [((sum(ord(c) for c in w) % 20) + 5) for w in text.split()]
@@ -383,6 +387,13 @@ class TestInfrastructure(unittest.TestCase):
         self.assertEqual(stub_llm.calls[0][0], 2)
         self.assertIsNotNone(emitted[0])
         self.assertIsNotNone(emitted[1])
+
+        # Extra chat stop token (<|end|> -> 99) terminates sequence cleanly
+        self.assertIn(99, engine.stop_token_ids)
+        stub_llm._next_tok = lambda prefix_ids: 99
+        emitted_stop, _ = engine.decode_step([seq_b])
+        self.assertIsNone(emitted_stop[0])
+        self.assertTrue(seq_b.finished)
 
 
 if __name__ == "__main__":

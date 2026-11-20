@@ -76,7 +76,7 @@ def _format_table(summaries: Sequence[RunSummary]) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run shared-GPU early-draft experiments.")
     parser.add_argument("--mode", choices=["mock", "vllm"], default="mock")
-    parser.add_argument("--model_name", default="Qwen/Qwen2.5-3B-Instruct")
+    parser.add_argument("--model_name", default="microsoft/Phi-4-mini-instruct")
     parser.add_argument("--dtype", default="bfloat16")
     parser.add_argument("--data_dir", default=str(PROJECT_ROOT / "data" / "fdb_v2_sample"))
     parser.add_argument("--split", choices=["dev", "held_out"], default="dev")
