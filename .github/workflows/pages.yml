@@ -1,0 +1,30 @@
+name: Deploy reports
+on:
+  push:
+    branches: [main]
+    paths: ['results/**/*.html', '.github/workflows/pages.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build site
+        run: |
+          mkdir site
+          (cd results && find . -name '*.html' -exec cp --parents {} ../site/ \;)
+          {
+            echo '<!doctype html><meta charset="utf-8"><title>Reports</title><h1>Reports</h1><ul>'
+            (cd site && find . -name '*.html' ! -name index.html | sort | sed 's|^\./||' | while read f; do echo "<li><a href=\"$f\">$f</a></li>"; done)
+            echo '</ul>'
+          } > site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
