@@ -1,0 +1,25 @@
+{
+  "source": "results/turns_vllm_dev.jsonl",
+  "turn_rows": 16,
+  "paired_comparisons": 8,
+  "token_comparisons": 0,
+  "text_only_comparisons": 8,
+  "output_mismatches": [
+    {
+      "load": "light",
+      "seed": 1,
+      "conversation_id": "dev_entity_tracking_slow_008#s2",
+      "turn_id": 1,
+      "policy": "fixed_interval",
+      "comparison": "response_text",
+      "baseline": "Since Boreas is offline for maintenance, it should not receive the apt security patch at this time. Between Atlas and Cygnus, the host that should receive the apt security patch first would be the one that is currently online and has the",
+      "candidate": "Since Boreas is offline for maintenance, it should not receive the apt security patch until it is back online. Between Atlas and Cygnus, the host that should receive the apt security patch first would be Atlas, as it is running Ubuntu"
+    }
+  ],
+  "warmup_mismatches": [],
+  "accounting_errors": [],
+  "duplicate_turns": [],
+  "missing_pairs": [],
+  "artifact_consistent": false,
+  "greedy_reference_status": "not_checked"
+}

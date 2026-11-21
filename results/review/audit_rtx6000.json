@@ -1,0 +1,70 @@
+{
+  "source": "results/rtx_6000/turns_vllm_dev.jsonl",
+  "turn_rows": 96,
+  "paired_comparisons": 48,
+  "token_comparisons": 0,
+  "text_only_comparisons": 48,
+  "output_mismatches": [
+    {
+      "load": "light",
+      "seed": 1,
+      "conversation_id": "dev_daily_slow_003#s7",
+      "turn_id": 1,
+      "policy": "fixed_interval",
+      "comparison": "response_text",
+      "baseline": "\"Thank you for the invitation. Could you please provide a summary of the meeting's key points after it concludes, as I will be unable to attend due to prior commitments?\"",
+      "candidate": "\"Thank you for the meeting invitation. Could you please provide a summary of the discussion points for me to review asynchronously?\""
+    },
+    {
+      "load": "intermediate",
+      "seed": 1,
+      "conversation_id": "dev_correction_slow_005#s0",
+      "turn_id": 0,
+      "policy": "fixed_interval",
+      "comparison": "response_text",
+      "baseline": "I don't have real-time access to flight schedules, but I can guide you on how to find the information you need. You can check various travel websites like Expedia, Kayak, Skyscanner, or directly on airline websites such as Delta",
+      "candidate": "I don't have real-time access to flight databases, but I can guide you on how to find the information you need. You can use flight search engines like Google Flights, Skyscanner, Kayak, or the official websites of airlines such"
+    },
+    {
+      "load": "heavy",
+      "seed": 1,
+      "conversation_id": "dev_daily_fast_000#s4",
+      "turn_id": 1,
+      "policy": "fixed_interval",
+      "comparison": "response_text",
+      "baseline": "Blue Donkey Coffee typically closes at 8 PM on weekdays, but Revelator might stay open until 9 PM. It's best to check their current hours on their websites or call ahead to confirm.",
+      "candidate": "Blue Donkey Coffee typically closes at 8 PM on weekdays, but Revelator often stays open until 10 PM. You might want to check Revelator for your report needs."
+    },
+    {
+      "load": "heavy",
+      "seed": 1,
+      "conversation_id": "dev_daily_slow_003#s7",
+      "turn_id": 1,
+      "policy": "fixed_interval",
+      "comparison": "response_text",
+      "baseline": "\"Thank you for the invitation. Could you please provide a summary of the meeting's key points after it concludes, as I will be unable to attend due to prior commitments?\"",
+      "candidate": "\"Thank you for the meeting invitation. Could you please provide a summary of the discussion points, so I can review them at my earliest convenience?\""
+    }
+  ],
+  "warmup_mismatches": [
+    {
+      "load": "heavy",
+      "seed": 1,
+      "conversation_id": "dev_correction_fast_006#s1",
+      "turn_id": 0,
+      "policy": "fixed_interval"
+    },
+    {
+      "load": "heavy",
+      "seed": 1,
+      "conversation_id": "dev_correction_fast_004#s3",
+      "turn_id": 0,
+      "policy": "fixed_interval"
+    }
+  ],
+  "accounting_errors": [],
+  "duplicate_turns": [],
+  "missing_pairs": [],
+  "artifact_consistent": false,
+  "greedy_reference_status": "not_checked"
+}

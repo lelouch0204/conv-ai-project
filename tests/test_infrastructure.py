@@ -154,7 +154,7 @@ class TestInfrastructure(unittest.TestCase):
         self.assertEqual(gateway.p0_decoding[0].conversation_id, "conv_b")
         self.assertEqual(len(gateway.p1_waiting_prefill), 1)
 
-        # Gateway discards stale draft on revision cue when controller declines to re-draft
+        # FixedInterval is speech-blind: retain the old candidate until verification.
         rev_gw = PriorityGateway(
             engine=engine,
             controller=FixedIntervalController(interval_ms=99999.0, budget_tokens=16, min_words=3),
@@ -168,7 +168,7 @@ class TestInfrastructure(unittest.TestCase):
         rev_gw.on_partial_arrive(
             "conv_c", 0, [], "Book a conference room for four wait no six", 0.0, 700.0
         )
-        self.assertEqual(len(rev_gw.conversations["conv_c"].active_draft_tokens), 0)
+        self.assertGreater(len(rev_gw.conversations["conv_c"].active_draft_tokens), 0)
         self.assertEqual(len(rev_gw.p1_waiting_prefill), 0)
 
     def test_all_policies_greedy_equivalence_and_paired_outputs(self) -> None:
@@ -183,6 +183,8 @@ class TestInfrastructure(unittest.TestCase):
         policy_names = [
             "no_draft",
             "fixed_interval",
+            "load_reuse_adaptive",
+            "reuse_only",
         ]
         baseline_outputs = None
         for name in policy_names:
@@ -235,12 +237,16 @@ class TestInfrastructure(unittest.TestCase):
 
         self.assertEqual(len(metrics), 10)
         self.assertEqual(sum(1 for m in metrics if m.is_warmup), 4)
-        self.assertTrue(all(m.is_warmup for m in metrics[:4]))
-        self.assertTrue(all(not m.is_warmup for m in metrics[4:]))
+        expected = sorted(sched, key=lambda ev: (
+            ev.utterance_start_ms + ev.trace.final.offset_ms,
+            ev.stream_conversation_id, ev.trace.turn_id,
+        ))[:4]
+        expected_keys = {(ev.stream_conversation_id, ev.trace.turn_id) for ev in expected}
+        self.assertEqual({(m.conversation_id, m.turn_id) for m in metrics if m.is_warmup}, expected_keys)
         self.assertEqual(summary.warmup_turns, 4)
         self.assertEqual(summary.num_turns, 6)
 
-        # Fallback when total completed turns <= warmup_turns
+        # An entirely warmup workload must not be reported as evaluated data.
         short_sched = generate_workload_schedule(
             dev_traces, arrival_rate_rps=1.0, seed=3, target_turns=3
         )
@@ -250,7 +256,7 @@ class TestInfrastructure(unittest.TestCase):
         self.assertEqual(len(short_metrics), 3)
         self.assertTrue(all(m.is_warmup for m in short_metrics))
         self.assertEqual(short_summary.warmup_turns, 3)
-        self.assertEqual(short_summary.num_turns, 3)
+        self.assertEqual(short_summary.num_turns, 0)
 
     def test_controller_revision_and_readiness_hooks(self) -> None:
         conv = ConversationState(conversation_id="conv_hook")
@@ -315,7 +321,7 @@ class TestInfrastructure(unittest.TestCase):
                 return " ".join(str(i) for i in ids)
 
         class _StubSamplingParams:
-            def __init__(self, temperature: float = 0.0, max_tokens: int = 1, prompt_logprobs=None):
+            def __init__(self, temperature: float = 0.0, max_tokens: int = 1, prompt_logprobs=None, **kwargs):
                 self.temperature = temperature
                 self.max_tokens = max_tokens
                 self.prompt_logprobs = prompt_logprobs
@@ -485,7 +491,7 @@ class TestInfrastructure(unittest.TestCase):
             self.assertTrue(out_html.exists())
             html_txt = out_html.read_text(encoding="utf-8")
             self.assertIn("Users &amp; Turns Timeline", html_txt)
-            self.assertIn("GPU Utilization &amp; Concurrency Over Time", html_txt)
+            self.assertIn("Scheduled Occupancy &amp; Concurrency Over Time", html_txt)
             self.assertIn("Turn Latency Over Time", html_txt)
             self.assertIn("TURN-ONLY MODE", html_txt)
             self.assertNotIn("Testing </script> safety", html_txt)

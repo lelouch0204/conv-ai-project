@@ -208,6 +208,10 @@ class BaseController:
 
     name: str = "base"
 
+    def allow_background_work(self, server_state: ServerState) -> bool:
+        """Whether queued/active drafts may consume this scheduling step."""
+        return True
+
     def is_revised(self, conv_state: ConversationState) -> bool:
         """Default naive revision check; override for custom/learned detectors."""
         return detect_revision_cue(

@@ -115,6 +115,8 @@ class PriorityGateway:
         self.min_sentence_tokens = int(min_sentence_tokens)
         self.sentence_fallback_tokens = int(sentence_fallback_tokens)
         self.record_trace = bool(record_trace)
+        if self.max_batch_size < 1 or self.max_new_tokens < 1:
+            raise ValueError("max_batch_size and max_new_tokens must be positive")
         self.step_trace: List[StepRecord] = []
 
         self.conversations: Dict[str, ConversationState] = {}
@@ -428,9 +430,13 @@ class PriorityGateway:
                     self.p0_decoding.append(req)
                 return step_ms, completions
 
-        # 2. If no P0 is waiting for prefill and a P1 draft needs prefill while batch has room
+        background_allowed = self.controller.allow_background_work(self.get_server_state(now_ms))
+
+        # 2. P1 prefills may contend with P0 under load-blind policies. The load
+        # controller additionally gates execution, so already-admitted work pauses.
         if (
-            not self.p0_waiting_prefill
+            background_allowed
+            and not self.p0_waiting_prefill
             and self.p1_waiting_prefill
             and (len(self.p0_decoding) + len(self.p1_decoding)) < self.max_batch_size
         ):
@@ -473,7 +479,7 @@ class PriorityGateway:
             assert req.seq_state is not None
             batch_seqs.append(req.seq_state)
 
-        remaining_slots = max(0, self.max_batch_size - len(batch_seqs))
+        remaining_slots = max(0, self.max_batch_size - len(batch_seqs)) if background_allowed else 0
         p1_active = list(self.p1_decoding[:remaining_slots])
         for dreq in p1_active:
             assert dreq.seq_state is not None

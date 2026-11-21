@@ -10,7 +10,9 @@ from src.controllers.base import (
 )
 from src.controllers.policies import (
     FixedIntervalController,
+    LoadReuseAdaptiveController,
     NoDraftController,
+    ReuseOnlyController,
     make_controller,
 )
 
@@ -23,5 +25,7 @@ __all__ = [
     "estimate_semantic_readiness",
     "NoDraftController",
     "FixedIntervalController",
+    "LoadReuseAdaptiveController",
+    "ReuseOnlyController",
     "make_controller",
 ]
