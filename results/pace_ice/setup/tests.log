@@ -1,0 +1,25 @@
+test_artifact_audit_detects_tokens_even_when_text_matches (test_correctness.TestCorrectness.test_artifact_audit_detects_tokens_even_when_text_matches) ... ok
+test_cache_reset_and_sampling_are_explicit (test_correctness.TestCorrectness.test_cache_reset_and_sampling_are_explicit) ... ok
+test_load_controller_pauses_existing_draft_and_resumes_after_foreground (test_correctness.TestCorrectness.test_load_controller_pauses_existing_draft_and_resumes_after_foreground) ... ok
+test_load_gating_and_reuse_budget_use_observed_state (test_correctness.TestCorrectness.test_load_gating_and_reuse_budget_use_observed_state) ... ok
+test_missing_or_incomplete_scores_cannot_release_invalid_tokens (test_correctness.TestCorrectness.test_missing_or_incomplete_scores_cannot_release_invalid_tokens) ... ok
+test_output_cap_and_eos_at_mismatch (test_correctness.TestCorrectness.test_output_cap_and_eos_at_mismatch) ... ok
+test_prompt_changes_and_all_mismatch_positions_match_full_reference (test_correctness.TestCorrectness.test_prompt_changes_and_all_mismatch_positions_match_full_reference) ... ok
+test_runner_marks_reference_divergence_invalid_and_exits_nonzero (test_correctness.TestCorrectness.test_runner_marks_reference_divergence_invalid_and_exits_nonzero) ... ok
+test_runner_validates_outputs_and_refuses_overwrite (test_correctness.TestCorrectness.test_runner_validates_outputs_and_refuses_overwrite) ... ok
+test_warmup_identities_and_outputs_are_paired_across_all_policies (test_correctness.TestCorrectness.test_warmup_identities_and_outputs_are_paired_across_all_policies) ... ok
+test_all_policies_greedy_equivalence_and_paired_outputs (test_infrastructure.TestInfrastructure.test_all_policies_greedy_equivalence_and_paired_outputs) ... ok
+test_controller_revision_and_readiness_hooks (test_infrastructure.TestInfrastructure.test_controller_revision_and_readiness_hooks) ... ok
+test_dataset_generation_and_split_isolation (test_infrastructure.TestInfrastructure.test_dataset_generation_and_split_isolation) ... ok
+test_exact_greedy_verification_cases (test_infrastructure.TestInfrastructure.test_exact_greedy_verification_cases) ... ok
+test_light_vs_heavy_load_trends (test_infrastructure.TestInfrastructure.test_light_vs_heavy_load_trends) ... ok
+test_priority_preemption_and_draft_cancellation (test_infrastructure.TestInfrastructure.test_priority_preemption_and_draft_cancellation) ... ok
+test_step_timeline_recording_and_jsonl_save (test_infrastructure.TestInfrastructure.test_step_timeline_recording_and_jsonl_save) ... ok
+test_visualizer_turn_only_and_timeline_modes (test_infrastructure.TestInfrastructure.test_visualizer_turn_only_and_timeline_modes) ... ok
+test_vllm_engine_verification_batched_decode_and_warmup (test_infrastructure.TestInfrastructure.test_vllm_engine_verification_batched_decode_and_warmup) ... ok
+test_warmup_turns_tagging_and_summary_filtering (test_infrastructure.TestInfrastructure.test_warmup_turns_tagging_and_summary_filtering) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 2.992s
+
+OK

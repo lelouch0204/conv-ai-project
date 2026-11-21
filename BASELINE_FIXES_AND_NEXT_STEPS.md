@@ -15,10 +15,10 @@ saved GPU comparisons do not establish the project's intended guarantee that
 every policy produces the same final-prompt greedy answer. Correct scheduling
 logic alone does not establish a correct or fair experiment.
 
-The fixes and two additional controllers are implemented in the working tree.
-All 20 CPU tests pass, and a new mock sweep passes output and accounting checks.
-The revised implementation has **not been run on a GPU in this workspace**.
-Historical GPU artifacts have been preserved unchanged.
+The fixes and two additional controllers are committed and deployed on PACE-ICE.
+All 20 CPU tests pass locally and on PACE. The mock sweep and bounded H100 GPU
+runs pass output and accounting checks. Section 10 records the exact GPU
+validation scope; historical GPU artifacts have been preserved unchanged.
 
 ## 1. Evidence from the original experiments
 
@@ -234,10 +234,53 @@ manifest, per-run summaries, turn logs, validation report, and HTML replay.
 These are synthetic simulation results, not GPU measurements. The mock ignores
 dialogue history and uses deterministic response templates and synthetic timing.
 
-## 10. What remains before making stronger claims
+## 10. PACE-ICE deployment and GPU validation
 
-1. Run the revised implementation on a GPU and investigate any reference or
-   cross-policy mismatches. Do not bypass failing checks for reported results.
+Code commit `239c2ea` was deployed into the submitting user's
+`~/scratch/conv-ai-project` checkout. Python 3.12.5, an isolated `uv` tool
+environment, and the locked project `.venv` were installed without changing
+other project environments. The Slurm script now uses account-local cache paths
+and accepts `MODEL_NAME` and `MODEL_REVISION`; it no longer assumes another team
+member's home directory.
+
+The tested configuration uses one NVIDIA H100 80 GB GPU, bfloat16, vLLM 0.34.0,
+and `VLLM_BATCH_INVARIANT=1`. Model and tokenizer are pinned to
+`cfbefacb99257ffa30c83adab238a50856ac3083` of
+`microsoft/Phi-4-mini-instruct`.
+
+| Slurm job | Scope | Checked responses | Result |
+| --- | --- | ---: | --- |
+| 7225949 | Four policies, light load, eight turns each | 32 | Completed, reference checks passed |
+| 7226125 | Four policies, three loads, 16 turns each | 192 | Completed, reference checks passed |
+
+Both jobs exited 0. All 224 responses, including warmup, match their direct
+greedy references. The artifact checks find zero output, warmup-pairing, or
+accounting mismatches. Slurm records 0.1642 allocated GPU-hours across both jobs,
+including first-use compilation and warmup.
+
+The three-load pilot has one seed and 12 evaluated turns per policy/load after
+four warmup turns. At intermediate load, `load_reuse_adaptive` has median/p95
+352.48/651.87 ms, compared with NoDraft's 432.54/714.74 ms and fixed drafting's
+633.91/1243.54 ms. At heavy load, its p95 is 753.19 ms versus fixed drafting's
+1119.72 ms, but NoDraft is better at 623.40 ms. Thus the controller helps in some
+sampled conditions, but does not uniformly beat waiting until the end.
+
+These results establish sampled output agreement for this H100 configuration.
+They do not diagnose the historical divergence or prove that it is resolved on
+RTX 6000 or other numerical configurations. They also do not establish
+statistical significance, held-out generalization, or conversation quality.
+
+Copied artifacts are in [`results/pace_ice/`](results/pace_ice/). See
+[`setup/deployment.json`](results/pace_ice/setup/deployment.json) for the
+deployment receipt and [`README.md`](README.md) for the full result table and
+repeat-run instructions. The remote checkout additionally contains
+`results/pace_setup/activate.sh` for restoring the tested environment.
+
+## 11. What remains before making stronger claims
+
+1. Expand the bounded H100 pilot across workload seeds and held-out inputs, and
+   investigate mismatches if other GPU/configurations are used. Do not bypass
+   failing checks for reported results.
 2. Replace or characterize the current backend's repeated one-token requests.
    It uses prefix caching, not persistent vLLM decode requests. This is a
    material serving-overhead limitation.

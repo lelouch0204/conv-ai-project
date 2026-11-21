@@ -1,0 +1,3 @@
+JobIDRaw|State|ElapsedRaw|ExitCode|AllocTRES|NodeList
+7225949|COMPLETED|310|0:0|billing=4,cpu=4,gres/gpu:h100=1,gres/gpu=1,mem=32G,node=1|atl1-1-03-010-25-0
+7226125|COMPLETED|281|0:0|billing=4,cpu=4,gres/gpu:h100=1,gres/gpu=1,mem=32G,node=1|atl1-1-03-010-25-0

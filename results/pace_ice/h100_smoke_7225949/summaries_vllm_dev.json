@@ -1,0 +1,178 @@
+[
+  {
+    "policy_name": "no_draft",
+    "load_regime": "light",
+    "arrival_rate_rps": 0.25,
+    "seed": 1,
+    "num_turns": 6,
+    "warmup_turns": 2,
+    "ttfs_p50_ms": 274.55,
+    "ttfs_p95_ms": 338.7,
+    "ttfs_mean_ms": 257.6,
+    "ttft_p50_ms": 13.14,
+    "ttft_p95_ms": 20.83,
+    "slo_target_ms": 190.0,
+    "slo_attainment_pct": 16.67,
+    "goodput_turns_per_sec": 0.063,
+    "goodput_tokens_per_sec": 15.34,
+    "total_drafted_tokens": 0,
+    "total_accepted_tokens": 0,
+    "total_canceled_tokens": 0,
+    "mean_acceptance_rate": 0.0,
+    "mean_p0_queue_wait_ms": 1.55,
+    "timeout_count": 0,
+    "total_sim_duration_ms": 15840.96,
+    "by_family": {
+      "correction": {
+        "count": 2.0,
+        "ttfs_p50_ms": 160.05,
+        "ttfs_p95_ms": 220.19,
+        "acceptance_rate": 0.0
+      },
+      "daily": {
+        "count": 2.0,
+        "ttfs_p50_ms": 303.02,
+        "ttfs_p95_ms": 335.6,
+        "acceptance_rate": 0.0
+      },
+      "entity_tracking": {
+        "count": 2.0,
+        "ttfs_p50_ms": 309.71,
+        "ttfs_p95_ms": 334.41,
+        "acceptance_rate": 0.0
+      }
+    }
+  },
+  {
+    "policy_name": "fixed_interval",
+    "load_regime": "light",
+    "arrival_rate_rps": 0.25,
+    "seed": 1,
+    "num_turns": 6,
+    "warmup_turns": 2,
+    "ttfs_p50_ms": 202.11,
+    "ttfs_p95_ms": 332.35,
+    "ttfs_mean_ms": 193.22,
+    "ttft_p50_ms": 15.45,
+    "ttft_p95_ms": 24.46,
+    "slo_target_ms": 190.0,
+    "slo_attainment_pct": 50.0,
+    "goodput_turns_per_sec": 0.19,
+    "goodput_tokens_per_sec": 15.4,
+    "total_drafted_tokens": 646,
+    "total_accepted_tokens": 38,
+    "total_canceled_tokens": 608,
+    "mean_acceptance_rate": 0.0588,
+    "mean_p0_queue_wait_ms": 2.82,
+    "timeout_count": 0,
+    "total_sim_duration_ms": 15780.85,
+    "by_family": {
+      "correction": {
+        "count": 2.0,
+        "ttfs_p50_ms": 72.99,
+        "ttfs_p95_ms": 120.1,
+        "acceptance_rate": 0.0929
+      },
+      "daily": {
+        "count": 2.0,
+        "ttfs_p50_ms": 187.95,
+        "ttfs_p95_ms": 269.8,
+        "acceptance_rate": 0.0944
+      },
+      "entity_tracking": {
+        "count": 2.0,
+        "ttfs_p50_ms": 318.73,
+        "ttfs_p95_ms": 343.25,
+        "acceptance_rate": 0.0
+      }
+    }
+  },
+  {
+    "policy_name": "load_reuse_adaptive",
+    "load_regime": "light",
+    "arrival_rate_rps": 0.25,
+    "seed": 1,
+    "num_turns": 6,
+    "warmup_turns": 2,
+    "ttfs_p50_ms": 206.15,
+    "ttfs_p95_ms": 334.97,
+    "ttfs_mean_ms": 206.75,
+    "ttft_p50_ms": 14.83,
+    "ttft_p95_ms": 23.11,
+    "slo_target_ms": 190.0,
+    "slo_attainment_pct": 50.0,
+    "goodput_turns_per_sec": 0.19,
+    "goodput_tokens_per_sec": 15.4,
+    "total_drafted_tokens": 243,
+    "total_accepted_tokens": 24,
+    "total_canceled_tokens": 219,
+    "mean_acceptance_rate": 0.0988,
+    "mean_p0_queue_wait_ms": 1.67,
+    "timeout_count": 0,
+    "total_sim_duration_ms": 15780.81,
+    "by_family": {
+      "correction": {
+        "count": 2.0,
+        "ttfs_p50_ms": 113.89,
+        "ttfs_p95_ms": 130.98,
+        "acceptance_rate": 0.0921
+      },
+      "daily": {
+        "count": 2.0,
+        "ttfs_p50_ms": 188.39,
+        "ttfs_p95_ms": 270.32,
+        "acceptance_rate": 0.1771
+      },
+      "entity_tracking": {
+        "count": 2.0,
+        "ttfs_p50_ms": 317.96,
+        "ttfs_p95_ms": 348.59,
+        "acceptance_rate": 0.0
+      }
+    }
+  },
+  {
+    "policy_name": "reuse_only",
+    "load_regime": "light",
+    "arrival_rate_rps": 0.25,
+    "seed": 1,
+    "num_turns": 6,
+    "warmup_turns": 2,
+    "ttfs_p50_ms": 190.97,
+    "ttfs_p95_ms": 333.18,
+    "ttfs_mean_ms": 190.08,
+    "ttft_p50_ms": 14.91,
+    "ttft_p95_ms": 19.68,
+    "slo_target_ms": 190.0,
+    "slo_attainment_pct": 50.0,
+    "goodput_turns_per_sec": 0.19,
+    "goodput_tokens_per_sec": 15.4,
+    "total_drafted_tokens": 366,
+    "total_accepted_tokens": 38,
+    "total_canceled_tokens": 328,
+    "mean_acceptance_rate": 0.1038,
+    "mean_p0_queue_wait_ms": 0.87,
+    "timeout_count": 0,
+    "total_sim_duration_ms": 15781.44,
+    "by_family": {
+      "correction": {
+        "count": 2.0,
+        "ttfs_p50_ms": 61.85,
+        "ttfs_p95_ms": 98.68,
+        "acceptance_rate": 0.1458
+      },
+      "daily": {
+        "count": 2.0,
+        "ttfs_p50_ms": 188.25,
+        "ttfs_p95_ms": 270.08,
+        "acceptance_rate": 0.1574
+      },
+      "entity_tracking": {
+        "count": 2.0,
+        "ttfs_p50_ms": 320.14,
+        "ttfs_p95_ms": 343.61,
+        "acceptance_rate": 0.0
+      }
+    }
+  }
+]

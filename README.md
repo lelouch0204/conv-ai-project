@@ -20,7 +20,8 @@ live ASR, TTS, or interactive examiner yet.
 
 All policies use the same gateway and verification path. Kernel calls already
 in flight cannot be preempted. The adaptive policy is a conservative first
-controller; it has not been tuned or validated on a GPU.
+controller; it has not been tuned. Bounded H100 correctness checks now pass for
+the configuration below; this is not a universal equivalence guarantee.
 
 ## Setup and checks
 
@@ -104,6 +105,48 @@ Generate the interactive report for any completed run:
 python scripts/visualize_run.py results/my_mock_run/turns_mock_dev.jsonl --ascii
 ```
 
+## Verified PACE-ICE deployment (November 21, 2026)
+
+The branch is deployed at `~/scratch/conv-ai-project` under the submitting PACE
+account. An isolated `.venv` uses the locked dependencies and Python 3.12.5.
+Model files are cached under that account's scratch directory. On the existing
+PACE checkout, repeat the verified H100 pilot with:
+
+```bash
+cd ~/scratch/conv-ai-project
+source results/pace_setup/activate.sh
+LOADS=light,intermediate,heavy TARGET_TURNS=16 WARMUP_TURNS=4 SEEDS=1 \
+  sbatch --partition=coe-gpu --gres=gpu:h100:1 scripts/run_pilot.sbatch
+```
+
+This explicitly overrides the script's RTX 6000 resource default. The verified
+configuration is H100 80 GB, bfloat16, `VLLM_BATCH_INVARIANT=1`, and model/tokenizer
+revision `cfbefacb99257ffa30c83adab238a50856ac3083`. CPU tests pass on PACE (20/20).
+Slurm jobs 7225949 (smoke) and 7226125 (three-load pilot) both completed with exit
+code 0; all 224 recorded responses match direct greedy references, with no
+paired-output, warmup, or accounting errors. Total allocated GPU time was
+0.1642 GPU-hours, including initial compilation and warmup.
+
+The pilot evaluates 12 turns per policy/load after four warmup turns, with one
+workload seed on the synthetic development sample:
+
+| Policy | Light p50 / p95 (ms) | Intermediate p50 / p95 (ms) | Heavy p50 / p95 (ms) |
+| --- | ---: | ---: | ---: |
+| `no_draft` | 390.31 / 439.16 | 432.54 / 714.74 | 477.68 / 623.40 |
+| `fixed_interval` | 339.71 / 466.19 | 633.91 / 1243.54 | 780.79 / 1119.72 |
+| `load_reuse_adaptive` | 372.50 / 467.80 | 352.48 / 651.87 | 493.46 / 753.19 |
+| `reuse_only` | 385.82 / 477.22 | 480.95 / 1097.94 | 706.81 / 1310.10 |
+
+The adaptive controller improves on both baselines at intermediate load in this
+sample; NoDraft retains the lowest heavy-load p95. These are pilot observations
+without estimates of variability, not evidence of a uniform controller win.
+Do not compare absolute latency against historical runs with different hardware
+or numerical configurations to attribute a speedup to these code fixes.
+
+Artifacts and receipts are in [`results/pace_ice/`](results/pace_ice/): full turn
+logs, timelines, reference checks, manifests, HTML replays, CPU test log, pinned
+model metadata, and Slurm accounting. The tested code commit is `239c2ea`.
+
 ## Interpretation and remaining limitations
 
 The original GPU results are unchanged. Their summaries agree with their logs,
@@ -152,7 +195,7 @@ allocated GPU-hours. `results/review/mock_dev/` contains CPU simulation only.
 ## AI assistance
 
 OpenAI Codex assisted with code review, implementation, regression tests, and
-CPU mock-run analysis. CPU tests and artifact checks were executed; changes have
-not been validated on a GPU in this workspace. Team members must review the
-implementation, verify GPU results, and record their own contributions and
-disclosures for submission.
+CPU mock-run analysis, PACE deployment, and GPU pilot execution. CPU tests and
+artifact/reference checks were executed, including the bounded H100 runs above.
+Team members must review the implementation and GPU results, and record their
+own contributions and disclosures for submission.

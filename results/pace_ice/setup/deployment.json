@@ -1,0 +1,41 @@
+{
+  "created_utc": "2026-11-21T18:23:28.841228+00:00",
+  "cluster": "PACE-ICE",
+  "project_directory": "/home/hice1/vmohanty7/scratch/conv-ai-project",
+  "branch": "fix/baseline-correctness-and-load-reuse",
+  "tested_commit": "239c2ea6b8e6e5b5df66a1cdd76681419efecc83",
+  "python": "3.12.5",
+  "cpu_tests": {
+    "passed": 20
+  },
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "dtype": "bfloat16",
+  "batch_invariant": true,
+  "model": {
+    "model": "microsoft/Phi-4-mini-instruct",
+    "revision": "cfbefacb99257ffa30c83adab238a50856ac3083",
+    "path": "/storage/ice1/2/8/vmohanty7/.cache/huggingface/hub/models--microsoft--Phi-4-mini-instruct/snapshots/cfbefacb99257ffa30c83adab238a50856ac3083"
+  },
+  "runs": [
+    {
+      "job_id": 7225949,
+      "label": "smoke",
+      "output_directory": "results/h100/run-7225949",
+      "status": "validated",
+      "reference_checked_turns": 32,
+      "reference_mismatches": 0,
+      "artifact_consistent": true
+    },
+    {
+      "job_id": 7226125,
+      "label": "three_load_pilot",
+      "output_directory": "results/h100/run-7226125",
+      "status": "validated",
+      "reference_checked_turns": 192,
+      "reference_mismatches": 0,
+      "artifact_consistent": true
+    }
+  ],
+  "allocated_gpu_hours": 0.1642,
+  "scope": "Synthetic development traces; one workload seed; bounded smoke and pilot, not held-out evaluation"
+}
