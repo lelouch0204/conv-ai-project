@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import sys
 import tempfile
 import unittest
@@ -34,11 +36,14 @@ from src.engine import (
     find_first_sentence_token_index,
     verify_draft_prefix,
 )
-from src.scheduler import PriorityGateway
+from src.scheduler import PriorityGateway, StepRecord
 from src.simulator import (
     DEFAULT_LOAD_RATES_RPS,
     ReplayHarness,
     generate_workload_schedule,
+    save_summaries_json,
+    save_timeline_jsonl,
+    save_turn_metrics_jsonl,
 )
 
 
@@ -394,6 +399,148 @@ class TestInfrastructure(unittest.TestCase):
         emitted_stop, _ = engine.decode_step([seq_b])
         self.assertIsNone(emitted_stop[0])
         self.assertTrue(seq_b.finished)
+
+    def test_step_timeline_recording_and_jsonl_save(self) -> None:
+        engine = CalibratedMockEngine()
+        gw = PriorityGateway(
+            engine=engine,
+            controller=FixedIntervalController(interval_ms=0.0, budget_tokens=4, min_words=2),
+            max_batch_size=4,
+            record_trace=True,
+        )
+        gw.on_partial_arrive("conv_tl", 0, [], "Book a flight to Boston", 0.0, 100.0)
+        gw.step(100.0)  # p1_prefill
+        gw.step(120.0)  # decode P1
+        gw.on_final_arrive("conv_tl", 0, [], "Book a flight to Boston.", 0.0, 150.0)
+        gw.step(150.0)  # p0_verify
+        gw.on_final_arrive("conv_no_draft", 0, [], "Hi there.", 155.0, 160.0)
+        gw.step(160.0)  # p0_prefill
+
+        self.assertEqual(len(gw.step_trace), 4)
+        self.assertTrue(all(isinstance(s, StepRecord) for s in gw.step_trace))
+        self.assertEqual(
+            [s.kind for s in gw.step_trace],
+            ["p1_prefill", "decode", "p0_verify", "p0_prefill"],
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dev_traces, _ = build_sample_fdb_v2_dataset(tmp, seed=42)
+            sched = generate_workload_schedule(
+                dev_traces, arrival_rate_rps=0.8, seed=1, target_turns=6
+            )
+            harness = ReplayHarness(engine=engine, record_timeline=True)
+            metrics, summary = harness.run(sched, FixedIntervalController(), "light", 0.8, 1)
+            self.assertGreater(len(harness.last_timeline), len(metrics))
+            kinds = {row["k"] for row in harness.last_timeline}
+            self.assertIn("p1_prefill", kinds)
+            self.assertIn("decode", kinds)
+            self.assertTrue({"p0_verify", "p0_prefill"} & kinds)
+
+            tl_path = Path(tmp) / "timeline_mock_dev.jsonl"
+            save_timeline_jsonl(harness.last_timeline, tl_path)
+            self.assertTrue(tl_path.exists())
+            lines = [ln for ln in tl_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+            self.assertEqual(len(lines), len(harness.last_timeline))
+
+    def test_visualizer_turn_only_and_timeline_modes(self) -> None:
+        from scripts import visualize_run
+
+        engine = CalibratedMockEngine()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_dir = Path(tmp)
+            dev_traces, _ = build_sample_fdb_v2_dataset(tmp_dir / "data", seed=42)
+            sched = generate_workload_schedule(
+                dev_traces, arrival_rate_rps=2.5, seed=1, target_turns=8
+            )
+
+            all_metrics = []
+            all_summaries = []
+            all_timeline = []
+            harness_tl = ReplayHarness(engine=engine, warmup_turns=2, record_timeline=True)
+            for pol in ("no_draft", "fixed_interval"):
+                m, s = harness_tl.run(sched, make_controller(pol), "heavy", 2.5, 1)
+                all_metrics.extend(m)
+                all_summaries.append(s)
+                all_timeline.extend(harness_tl.last_timeline)
+
+            # Inject script close tag in one response_text to verify HTML safety escaping
+            all_metrics[0].response_text = "Testing </script> safety"
+
+            # 1) Turn-only mode (no timeline file present)
+            turn_only_dir = tmp_dir / "turn_only"
+            turns_p = turn_only_dir / "turns_mock_dev.jsonl"
+            sums_p = turn_only_dir / "summaries_mock_dev.json"
+            save_turn_metrics_jsonl(all_metrics, turns_p)
+            save_summaries_json(all_summaries, sums_p)
+
+            t_res, s_res, tl_res, out_html = visualize_run.resolve_input_paths(sums_p)
+            self.assertEqual(t_res, turns_p)
+            self.assertEqual(s_res, sums_p)
+            self.assertIsNone(tl_res)
+
+            buf_only = io.StringIO()
+            with contextlib.redirect_stdout(buf_only):
+                visualize_run.main([str(sums_p), "--bin_ms", "200"])
+            self.assertIn("Turn-only mode", buf_only.getvalue().replace("turn-only mode", "Turn-only mode"))
+            self.assertTrue(out_html.exists())
+            html_txt = out_html.read_text(encoding="utf-8")
+            self.assertIn("Users &amp; Turns Timeline", html_txt)
+            self.assertIn("GPU Utilization &amp; Concurrency Over Time", html_txt)
+            self.assertIn("Turn Latency Over Time", html_txt)
+            self.assertIn("TURN-ONLY MODE", html_txt)
+            self.assertNotIn("Testing </script> safety", html_txt)
+            self.assertIn(r"Testing <\/script> safety", html_txt)
+
+            # Verify utilization bounds 0 <= util <= 100 in turn-only mode
+            payload_only = visualize_run.build_visualization_payload(
+                turns_rows=[m.to_dict() for m in all_metrics],
+                summary_rows=[s.to_dict() for s in all_summaries],
+                timeline_rows=[],
+                bin_ms=200.0,
+            )
+            for pol in ("no_draft", "fixed_interval"):
+                bins = payload_only["groups"][0]["policies"][pol]["bins"]
+                self.assertGreater(len(bins), 0)
+                for b in bins:
+                    self.assertGreaterEqual(b["total_gpu_busy_pct"], 0.0)
+                    self.assertLessEqual(b["total_gpu_busy_pct"], 100.0)
+                    self.assertEqual(b["p1_util_pct"], 0.0)
+
+            # 2) Full timeline mode (sibling timeline_*.jsonl present)
+            full_dir = tmp_dir / "full"
+            turns_f = full_dir / "turns_mock_dev.jsonl"
+            sums_f = full_dir / "summaries_mock_dev.json"
+            tl_f = full_dir / "timeline_mock_dev.jsonl"
+            save_turn_metrics_jsonl(all_metrics, turns_f)
+            save_summaries_json(all_summaries, sums_f)
+            save_timeline_jsonl(all_timeline, tl_f)
+
+            buf_full = io.StringIO()
+            with contextlib.redirect_stdout(buf_full):
+                visualize_run.main([str(turns_f), "--ascii", "--bin_ms", "200"])
+            ascii_out = buf_full.getvalue()
+            self.assertIn("REPLAY:", ascii_out)
+            self.assertIn("Full Timeline (P0+P1)", ascii_out)
+            full_html = (full_dir / "replay_mock_dev.html").read_text(encoding="utf-8")
+            self.assertIn("FULL TIMELINE MODE", full_html)
+
+            payload_full = visualize_run.build_visualization_payload(
+                turns_rows=[m.to_dict() for m in all_metrics],
+                summary_rows=[s.to_dict() for s in all_summaries],
+                timeline_rows=all_timeline,
+                bin_ms=200.0,
+            )
+            fixed_run = payload_full["groups"][0]["policies"]["fixed_interval"]
+            self.assertTrue(fixed_run["has_timeline"])
+            self.assertGreater(fixed_run["aggregates"]["avg_p1_util_pct"], 0.0)
+            for b in fixed_run["bins"]:
+                self.assertGreaterEqual(b["total_gpu_busy_pct"], 0.0)
+                self.assertLessEqual(b["total_gpu_busy_pct"], 100.0)
+                self.assertAlmostEqual(
+                    b["p0_util_pct"] + b["p1_util_pct"],
+                    b["total_gpu_busy_pct"],
+                    places=1,
+                )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shared-GPU Voice Draft Replay — turns_vllm_dev.jsonl</title>
+<style>
+:root {
+  --bg: #0b101b;
+  --panel: #131b2b;
+  --panel2: #192338;
+  --border: #26344f;
+  --text: #e6edf7;
+  --muted: #93a4bf;
+  --speak: #3b82f6;
+  --draft: #a855f7;
+  --queue: #f59e0b;
+  --ttft: #06b6d4;
+  --ttfs: #10b981;
+  --bad: #ef4444;
+  --tail: #059669;
+  --accent: #38bdf8;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 14px 18px 28px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+}
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: 0.2px; }
+.badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  color: var(--muted);
+}
+.badge.full { color: #c4b5fd; border-color: #6d28d9; background: rgba(109, 40, 217, 0.16); }
+.badge.turn { color: #fcd34d; border-color: #b45309; background: rgba(180, 83, 9, 0.16); }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  margin-bottom: 10px;
+}
+.ctrl-group { display: flex; align-items: center; gap: 6px; }
+label { color: var(--muted); font-size: 12px; }
+select, button, input[type="range"] {
+  background: var(--panel2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+button { cursor: pointer; font-weight: 500; }
+button:hover { border-color: var(--accent); color: #fff; }
+button.primary { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+.scrubber { flex: 1 1 240px; min-width: 180px; padding: 0; }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+}
+.card-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+.card-val { font-size: 17px; font-weight: 700; margin-top: 3px; }
+.card-sub { color: var(--muted); font-size: 11px; margin-top: 3px; line-height: 1.35; }
+.pos { color: #34d399; }
+.neg { color: #f87171; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px 6px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.panel-hdr {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.panel-title { font-weight: 600; font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: var(--muted); }
+.leg-item { display: inline-flex; align-items: center; gap: 4px; }
+.swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+canvas { width: 100%; display: block; cursor: crosshair; }
+#tooltip {
+  position: fixed;
+  pointer-events: none;
+  display: none;
+  z-index: 999;
+  background: rgba(11, 16, 27, 0.96);
+  border: 1px solid #3b82f6;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  max-width: 360px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.bottom-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.05fr) minmax(380px, 1.35fr);
+  gap: 10px;
+}
+@media (max-width: 1024px) {
+  .bottom-grid { grid-template-columns: 1fr; }
+}
+.inspector-body { font-size: 12px; line-height: 1.45; }
+.kv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: 6px;
+  margin: 8px 0;
+}
+.kv { background: var(--panel2); padding: 6px 8px; border-radius: 5px; border: 1px solid var(--border); }
+.kv .k { font-size: 10.5px; color: var(--muted); }
+.kv .v { font-size: 13px; font-weight: 600; margin-top: 2px; }
+.resp-box {
+  background: #0d1422;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px;
+  white-space: pre-wrap;
+  max-height: 140px;
+  overflow: auto;
+  font-size: 12px;
+  color: #dbeafe;
+}
+.table-wrap { max-height: 360px; overflow: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--border); }
+th { position: sticky; top: 0; background: var(--panel2); color: var(--muted); font-weight: 600; z-index: 2; }
+tr { cursor: pointer; }
+tr:hover { background: rgba(56, 189, 248, 0.08); }
+tr.selected { background: rgba(59, 130, 246, 0.22); }
+.pill {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.pill.ok { background: rgba(16, 185, 129, 0.18); color: #34d399; }
+.pill.miss { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+.pill.warm { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Shared-GPU Voice Draft Simulation Replay <span id="hdr-source" class="muted mono" style="font-size:12px;color:#93a4bf;"></span></h1>
+  </div>
+  <div id="mode-badge" class="badge"></div>
+</header>
+
+<div class="controls">
+  <div class="ctrl-group">
+    <label for="sel-group">Workload</label>
+    <select id="sel-group"></select>
+  </div>
+  <div class="ctrl-group">
+    <label for="sel-policy">Policy</label>
+    <select id="sel-policy"></select>
+  </div>
+  <div class="ctrl-group">
+    <label for="sel-compare">Compare</label>
+    <select id="sel-compare"></select>
+  </div>
+  <div class="ctrl-group">
+    <button id="btn-play" class="primary">Play</button>
+    <button id="btn-reset">Reset</button>
+    <button id="btn-prev" title="Previous turn ([)">&lt; Turn</button>
+    <button id="btn-next" title="Next turn (])">Turn &gt;</button>
+  </div>
+  <div class="ctrl-group">
+    <label for="sel-speed">Speed</label>
+    <select id="sel-speed">
+      <option value="0.25">0.25x</option>
+      <option value="0.5">0.5x</option>
+      <option value="1">1x</option>
+      <option value="2" selected>2x</option>
+      <option value="5">5x</option>
+      <option value="10">10x</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label for="sel-zoom">Zoom</label>
+    <select id="sel-zoom">
+      <option value="1" selected>1x</option>
+      <option value="2">2x</option>
+      <option value="4">4x</option>
+      <option value="8">8x</option>
+      <option value="16">16x</option>
+    </select>
+    <label><input type="checkbox" id="chk-follow" checked> Follow</label>
+  </div>
+  <input id="rng-time" class="scrubber" type="range" min="0" max="1000" value="0" step="1">
+  <span id="lbl-clock" class="mono" style="min-width:138px;text-align:right;">0.00 / 0.00 s</span>
+</div>
+
+<div class="cards" id="cards"></div>
+
+<div class="panel">
+  <div class="panel-hdr">
+    <span class="panel-title">Users &amp; Turns Timeline <span style="color:var(--muted);font-weight:400;font-size:11.5px;">(click turn to inspect, drag background to scrub, Shift+drag when zoomed to pan)</span></span>
+    <div class="legend">
+      <span class="leg-item"><span class="swatch" style="background:var(--speak)"></span>Speaking</span>
+      <span class="leg-item"><span class="swatch" style="background:var(--draft)"></span>P1 Draft</span>
+      <span class="leg-item"><span class="swatch" style="background:var(--queue)"></span>P0 Queue</span>
+      <span class="leg-item"><span class="swatch" style="background:var(--ttft)"></span>Prefill/TTFT</span>
+      <span class="leg-item"><span class="swatch" style="background:var(--ttfs)"></span>TTFS (&le;SLO)</span>
+      <span class="leg-item"><span class="swatch" style="background:var(--bad)"></span>TTFS (&gt;SLO)</span>
+      <span class="leg-item"><span class="swatch" style="background:var(--tail)"></span>Tail Decode</span>
+    </div>
+  </div>
+  <canvas id="cv-lanes"></canvas>
+</div>
+
+<div class="panel">
+  <div class="panel-hdr">
+    <span class="panel-title">GPU Utilization &amp; Concurrency Over Time</span>
+    <div class="legend">
+      <span class="leg-item"><span class="swatch" style="background:rgba(16,185,129,0.55)"></span>P0 GPU %</span>
+      <span class="leg-item"><span class="swatch" style="background:rgba(168,85,247,0.55)"></span>P1 Draft GPU %</span>
+      <span class="leg-item"><span class="swatch" style="background:#3b82f6"></span>Active Speakers</span>
+      <span class="leg-item"><span class="swatch" style="background:#22d3ee"></span>GPU Batch</span>
+      <span class="leg-item"><span class="swatch" style="background:#f59e0b"></span>P0 Queue</span>
+    </div>
+  </div>
+  <canvas id="cv-gpu"></canvas>
+</div>
+
+<div class="panel">
+  <div class="panel-hdr">
+    <span class="panel-title">Turn Latency Over Time (at utterance end)</span>
+    <div class="legend">
+      <span class="leg-item"><span class="swatch" style="background:#10b981"></span>TTFS (&le;SLO)</span>
+      <span class="leg-item"><span class="swatch" style="background:#ef4444"></span>TTFS (&gt;SLO)</span>
+      <span class="leg-item"><span class="swatch" style="background:#06b6d4"></span>TTFT</span>
+      <span class="leg-item"><span class="swatch" style="background:#f59e0b"></span>Queue Wait</span>
+      <span class="leg-item"><span class="swatch" style="background:#c084fc"></span>Compare TTFS (dashed)</span>
+    </div>
+  </div>
+  <canvas id="cv-lat"></canvas>
+</div>
+
+<div class="bottom-grid">
+  <div class="panel">
+    <div class="panel-hdr">
+      <span class="panel-title">Turn Inspector</span>
+      <span id="insp-sub" class="mono" style="color:var(--muted);font-size:11px;">Click any turn bar or table row</span>
+    </div>
+    <div id="inspector" class="inspector-body" style="color:var(--muted);">No turn selected yet.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-hdr">
+      <span class="panel-title">All Turns</span>
+      <span id="tbl-sub" class="mono" style="color:var(--muted);font-size:11px;"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>T</th>
+            <th>Family</th>
+            <th>End(s)</th>
+            <th>Wait</th>
+            <th>TTFT</th>
+            <th>TTFS</th>
+            <th>Total</th>
+            <th>Acc/Drf</th>
+            <th id="th-delta">Delta</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script id="replay-data" type="application/json">{"version": 1, "source_name": "turns_vllm_dev.jsonl", "groups": [{"group_id": "light|seed=1", "load_regime": "light", "seed": 1, "arrival_rate_rps": 0.25, "t_max_ms": 33992.97, "bin_ms": 170.0, "slo_target_ms": 190.0, "max_batch_size": 8, "users": ["dev_correction_slow_005#s0", "dev_correction_fast_006#s1", "dev_entity_tracking_slow_008#s2", "dev_correction_fast_004#s3", "dev_daily_fast_000#s4"], "policies": {"no_draft": {"policy_name": "no_draft", "has_timeline": false, "summary": {"policy_name": "no_draft", "load_regime": "light", "arrival_rate_rps": 0.25, "seed": 1, "num_turns": 6, "warmup_turns": 2, "ttfs_p50_ms": 149.62, "ttfs_p95_ms": 175.33, "ttfs_mean_ms": 148.6, "ttft_p50_ms": 6.96, "ttft_p95_ms": 11.63, "slo_target_ms": 190.0, "slo_attainment_pct": 100.0, "goodput_turns_per_sec": 0.384, "goodput_tokens_per_sec": 15.8, "total_drafted_tokens": 0, "total_accepted_tokens": 0, "total_canceled_tokens": 0, "mean_acceptance_rate": 0.0, "mean_p0_queue_wait_ms": 1.0, "timeout_count": 0, "total_sim_duration_ms": 15633.68, "by_family": {"correction": {"count": 2.0, "ttfs_p50_ms": 135.51, "ttfs_p95_ms": 151.44, "acceptance_rate": 0.0}, "daily": {"count": 2.0, "ttfs_p50_ms": 149.74, "ttfs_p95_ms": 172.84, "acceptance_rate": 0.0}, "entity_tracking": {"count": 2.0, "ttfs_p50_ms": 160.57, "ttfs_p95_ms": 173.65, "acceptance_rate": 0.0}}}, "aggregates": {"avg_gpu_util_pct": 7.31, "avg_p0_util_pct": 7.31, "avg_p1_util_pct": 0.0, "peak_gpu_util_pct": 100.0, "peak_speakers": 3, "peak_batch": 2, "peak_queue": 1}, "turns": [{"conversation_id": "dev_correction_slow_005#s0", "turn_id": 0, "key": "dev_correction_slow_005#s0:t0", "family": "correction", "pacing": "slow", "synthetic_revision": true, "is_warmup": true, "timed_out": false, "utterance_start_ms": 0.0, "utterance_end_ms": 8654.0, "q_end_ms": 8654.0, "ttft_end_ms": 8661.25, "ttfs_end_ms": 8830.51, "completion_ms": 9009.59, "p0_queue_wait_ms": 0.0, "ttft_ms": 7.25, "ttfs_ms": 176.51, "total_response_ms": 355.59, "drafted_tokens": 0, "accepted_tokens": 0, "canceled_tokens": 0, "acceptance_rate": 0.0, "response_text": "I don't have real-time access to flight databases, but I can guide you on how to find the information you need. You can use various travel websites and apps such as Google Flights, Skyscanner, Kayak, or the official websites", "draft_bursts": []}, {"conversation_id": "dev_correction_fast_006#s1", "turn_id": 0, "key": "dev_correction_fast_006#s1:t0", "family": "correction", "pacing": "fast", "synthetic_revision": true, "is_warmup": true, "timed_out": false, "utterance_start_ms": 11054.84, "utterance_end_ms": 16578.34, "q_end_ms": 16578.34, "ttft_end_ms": 16585.31, "ttfs_end_ms": 16666.61, "completion_ms": 16932.94, "p0_queue_wait_ms": 0.0, "ttft_ms": 6.97, "ttfs_ms": 88.27, "total_response_ms": 354.6, "drafted_tokens": 0, "accepted_tokens": 0, "canceled_tokens": 0, "acceptance_rate": 0.0, "response_text": "Sure, I can help you set a daily alarm schedule. However, as an AI, I don't have the capability to set alarms directly on your device. You can set the alarms yourself using your phone, computer, or any other device you", "draft_bursts": []}, {"conversation_id": "dev_entity_tracking_slow_008#s2", "turn_id": 0, "key": "dev_entity_tracking_slow_008#s2:t0", "family": "entity_tracking", "pacing": "slow", "synthetic_revision": false, "is_warmup": false, "timed_out": false, "utterance_start_ms": 11755.72, "utterance_end_ms": 18022.72, "q_end_ms": 18022.72, "ttft_end_ms": 18029.74, "ttfs_end_ms": 18197.82, "completion_ms": 18383.14, "p0_queue_wait_ms": 0.0, "ttft_ms": 7.02, "ttfs_ms": 175.1, "total_response_ms": 360.42, "drafted_tokens": 0, "accepted_tokens": 0, "canceled_tokens": 0, "acceptance_rate": 0.0, "response_text": "To manage these three servers, you can use a combination of configuration management tools and orchestration platforms. Here are some options for each server based on their operating systems:\n\n1. Atlas (Ubuntu):\n   - Ansible: Ansible is a", "draft_bursts": []}, {"conversation_id": "dev_correction_fast_004#s3", "turn_id": 0, "key": "dev_correction_fast_004#s3:t0", "family": "correction", "pacing": "fast", "synthetic_revision": true, "is_warmup": false, "timed_out": false, "utterance_start_ms": 11960.21, "utterance_end_ms": 18302.41, "q_end_ms": 18308.4, "ttft_end_ms": 18315.57, "ttfs_end_ms": 18455.62, "completion_ms": 18536.63, "p0_queue_wait_ms": 5.99, "ttft_ms": 13.16, "ttfs_ms": 153.21, "total_response_ms": 234.22, "drafted_tokens": 0, "accepted_tokens": 0, "canceled_tokens": 0, "acceptance_rate": 0.0, "response_text": "I have updated your booking to a conference room for six people at 3:30 PM tomorrow. Is there anything else I can assist you with?", "draft_bursts": []}, {"conversation_id": "dev_entity_tracking_slow_008#s2", "turn_id": 1, "key": "dev_entity_tracking_slow_008#s2:t1", "family": "entity_tracking", "pacing": "slow", "synthetic_revision": false, "is_warmup": false, "timed_out": false, "utterance_start_ms": 19122.72, "utterance_end_ms": 25465.02, "q_end_ms": 25465.02, "ttft_end_ms": 25471.93, "ttfs_end_ms": 25611.06, "completion_ms": 25819.08, "p0_queue_wait_ms": 0.0, "ttft_ms": 6.91, "ttfs_ms": 146.04, "total_response_ms": 354.06, "drafted_tokens": 0, "accepted_tokens": 0, "canceled_tokens": 0, "acceptance_rate": 0.0, "response_text": "Since Boreas is offline for maintenance, it should not receive the apt security patch at this time. Between Atlas and Cygnus, the host that should receive the apt security patch first would be the one that is currently online and has the", "draft_bursts": []}, {"conversation_id": "dev_correction_fast_004#s3", "turn_id": 1, "key": "dev_correction_fast_004#s3:t1", "family": "correction", "pacing": "fast", "synthetic_revision": true, "is_warmup": false, "timed_out": false, "utterance_start_ms": 19402.41, "utterance_end_ms": 24416.11, "q_end_ms": 24416.11, "ttft_end_ms": 24423.05, "ttfs_end_ms": 24533.92, "completion_ms": 24637.76, "p0_queue_wait_ms": 0.0, "ttft_ms": 6.94, "ttfs_ms": 117.81, "total_response_ms": 221.65, "drafted_tokens": 0, "accepted_tokens": 0, "canceled_tokens": 0, "acceptance_rate": 0.0, "response_text": "I have updated the calendar invite to include the Product Design team instead of Finance. The invite has been sent to the Marketing and Product Design teams.", "draft_bursts": []}, {"conversation_id": "dev_daily_fast_000#s4", "turn_id": 0, "key": "dev_daily_fast_000#s4:t0", "family": "daily", "pacing": "fast", "synthetic_revision": false, "is_warmup": false, "timed_out": false, "utterance_start_ms": 24806.13, "utterance_end_ms": 28132.63, "q_end_ms": 28132.63, "ttft_end_ms": 28139.62, "ttfs_end_ms": 28256.69, "completion_ms": 28486.02, "p0_queue_wait_ms": 0.0, "ttft_ms": 6.99, "ttfs_ms": 124.06, "total_response_ms": 353.39, "drafted_tokens": 0, "accepted_tokens": 0, "canceled_tokens": 0, "acceptance_rate": 0.0, "response_text": "Certainly! To provide a recommendation, I would need to know your specific campus location. However, I can give you a general suggestion that you can adapt to your area:\n\n**The Nook Coffee**\n\nThe Nook Coffee is a popular choice", "draft_bursts": []}, {"conversation_id": "dev_daily_fast_000#s4", "turn_id": 1, "key": "dev_daily_fast_000#s4:t1", "family": "daily", "pacing": "fast", "synthetic_revision": false, "is_warmup": false, "timed_out": false, "utterance_start_ms": 29232.63, "utterance_end_ms": 33325.23, "q_end_ms": 33325.23, "ttft_end_ms": 33332.16, "ttfs_end_ms": 33500.64, "completion_ms": 33656.4, "p0_queue_wait_ms": 0.0, "ttft_ms": 6.93, "ttfs_ms": 175.41, "total_response_ms": 331.17, "drafted_tokens": 0, "accepted_tokens": 0, "canceled_tokens": 0, "acceptance_rate": 0.0, "response_text": "Blue Donkey Coffee typically closes at 8 PM on weekdays, but Revelator might stay open until 9 PM. It's best to check their current hours of operation on their respective websites or call them directly to confirm.", "draft_bursts": []}], "bins": [{"t0": 0.0, "t1": 170.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 170.0, "t1": 340.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 340.0, "t1": 510.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 510.0, "t1": 680.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 680.0, "t1": 850.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 850.0, "t1": 1020.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1020.0, "t1": 1190.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1190.0, "t1": 1360.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1360.0, "t1": 1530.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1530.0, "t1": 1700.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1700.0, "t1": 1870.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1870.0, "t1": 2040.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2040.0, "t1": 2210.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2210.0, "t1": 2380.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2380.0, "t1": 2550.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2550.0, "t1": 2720.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2720.0, "t1": 2890.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2890.0, "t1": 3060.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3060.0, "t1": 3230.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3230.0, "t1": 3400.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3400.0, "t1": 3570.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3570.0, "t1": 3740.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3740.0, "t1": 3910.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3910.0, "t1": 4080.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4080.0, "t1": 4250.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4250.0, "t1": 4420.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4420.0, "t1": 4590.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4590.0, "t1": 4760.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4760.0, "t1": 4930.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4930.0, "t1": 5100.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5100.0, "t1": 5270.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5270.0, "t1": 5440.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5440.0, "t1": 5610.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5610.0, "t1": 5780.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5780.0, "t1": 5950.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5950.0, "t1": 6120.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6120.0, "t1": 6290.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6290.0, "t1": 6460.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6460.0, "t1": 6630.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6630.0, "t1": 6800.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6800.0, "t1": 6970.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6970.0, "t1": 7140.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7140.0, "t1": 7310.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7310.0, "t1": 7480.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7480.0, "t1": 7650.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7650.0, "t1": 7820.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7820.0, "t1": 7990.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7990.0, "t1": 8160.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 8160.0, "t1": 8330.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 8330.0, "t1": 8500.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 8500.0, "t1": 8670.0, "p0_util_pct": 9.41, "p1_util_pct": 0.0, "total_gpu_busy_pct": 9.41, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 8670.0, "t1": 8840.0, "p0_util_pct": 100.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 100.0, "active_speakers": 0, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 8840.0, "t1": 9010.0, "p0_util_pct": 99.76, "p1_util_pct": 0.0, "total_gpu_busy_pct": 99.76, "active_speakers": 0, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9010.0, "t1": 9180.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9180.0, "t1": 9350.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9350.0, "t1": 9520.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9520.0, "t1": 9690.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9690.0, "t1": 9860.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9860.0, "t1": 10030.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10030.0, "t1": 10200.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10200.0, "t1": 10370.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10370.0, "t1": 10540.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10540.0, "t1": 10710.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10710.0, "t1": 10880.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10880.0, "t1": 11050.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11050.0, "t1": 11220.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11220.0, "t1": 11390.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11390.0, "t1": 11560.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11560.0, "t1": 11730.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11730.0, "t1": 11900.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11900.0, "t1": 12070.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12070.0, "t1": 12240.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12240.0, "t1": 12410.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12410.0, "t1": 12580.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12580.0, "t1": 12750.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12750.0, "t1": 12920.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12920.0, "t1": 13090.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13090.0, "t1": 13260.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13260.0, "t1": 13430.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13430.0, "t1": 13600.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13600.0, "t1": 13770.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13770.0, "t1": 13940.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13940.0, "t1": 14110.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14110.0, "t1": 14280.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14280.0, "t1": 14450.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14450.0, "t1": 14620.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14620.0, "t1": 14790.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14790.0, "t1": 14960.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14960.0, "t1": 15130.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15130.0, "t1": 15300.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15300.0, "t1": 15470.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15470.0, "t1": 15640.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15640.0, "t1": 15810.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15810.0, "t1": 15980.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15980.0, "t1": 16150.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 16150.0, "t1": 16320.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 16320.0, "t1": 16490.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 16490.0, "t1": 16660.0, "p0_util_pct": 48.04, "p1_util_pct": 0.0, "total_gpu_busy_pct": 48.04, "active_speakers": 3, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 16660.0, "t1": 16830.0, "p0_util_pct": 100.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 100.0, "active_speakers": 2, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 16830.0, "t1": 17000.0, "p0_util_pct": 60.55, "p1_util_pct": 0.0, "total_gpu_busy_pct": 60.55, "active_speakers": 2, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17000.0, "t1": 17170.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17170.0, "t1": 17340.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17340.0, "t1": 17510.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17510.0, "t1": 17680.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17680.0, "t1": 17850.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17850.0, "t1": 18020.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 18020.0, "t1": 18190.0, "p0_util_pct": 98.4, "p1_util_pct": 0.0, "total_gpu_busy_pct": 98.4, "active_speakers": 2, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 18190.0, "t1": 18360.0, "p0_util_pct": 100.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 100.0, "active_speakers": 1, "max_batch_p0": 2, "max_batch_p1": 0, "max_queue_p0": 1, "max_queue_p1": 0}, {"t0": 18360.0, "t1": 18530.0, "p0_util_pct": 100.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 100.0, "active_speakers": 0, "max_batch_p0": 2, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 18530.0, "t1": 18700.0, "p0_util_pct": 3.9, "p1_util_pct": 0.0, "total_gpu_busy_pct": 3.9, "active_speakers": 0, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 18700.0, "t1": 18870.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 18870.0, "t1": 19040.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19040.0, "t1": 19210.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19210.0, "t1": 19380.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19380.0, "t1": 19550.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19550.0, "t1": 19720.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19720.0, "t1": 19890.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19890.0, "t1": 20060.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20060.0, "t1": 20230.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20230.0, "t1": 20400.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20400.0, "t1": 20570.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20570.0, "t1": 20740.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20740.0, "t1": 20910.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20910.0, "t1": 21080.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21080.0, "t1": 21250.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21250.0, "t1": 21420.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21420.0, "t1": 21590.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21590.0, "t1": 21760.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21760.0, "t1": 21930.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21930.0, "t1": 22100.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22100.0, "t1": 22270.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22270.0, "t1": 22440.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22440.0, "t1": 22610.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22610.0, "t1": 22780.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22780.0, "t1": 22950.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22950.0, "t1": 23120.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23120.0, "t1": 23290.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23290.0, "t1": 23460.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23460.0, "t1": 23630.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23630.0, "t1": 23800.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23800.0, "t1": 23970.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23970.0, "t1": 24140.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24140.0, "t1": 24310.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24310.0, "t1": 24480.0, "p0_util_pct": 37.58, "p1_util_pct": 0.0, "total_gpu_busy_pct": 37.58, "active_speakers": 2, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24480.0, "t1": 24650.0, "p0_util_pct": 92.8, "p1_util_pct": 0.0, "total_gpu_busy_pct": 92.8, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24650.0, "t1": 24820.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24820.0, "t1": 24990.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24990.0, "t1": 25160.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 25160.0, "t1": 25330.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 25330.0, "t1": 25500.0, "p0_util_pct": 20.58, "p1_util_pct": 0.0, "total_gpu_busy_pct": 20.58, "active_speakers": 2, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 25500.0, "t1": 25670.0, "p0_util_pct": 100.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 100.0, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 25670.0, "t1": 25840.0, "p0_util_pct": 87.69, "p1_util_pct": 0.0, "total_gpu_busy_pct": 87.69, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 25840.0, "t1": 26010.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26010.0, "t1": 26180.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26180.0, "t1": 26350.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26350.0, "t1": 26520.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26520.0, "t1": 26690.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26690.0, "t1": 26860.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26860.0, "t1": 27030.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27030.0, "t1": 27200.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27200.0, "t1": 27370.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27370.0, "t1": 27540.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27540.0, "t1": 27710.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27710.0, "t1": 27880.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27880.0, "t1": 28050.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28050.0, "t1": 28220.0, "p0_util_pct": 51.39, "p1_util_pct": 0.0, "total_gpu_busy_pct": 51.39, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28220.0, "t1": 28390.0, "p0_util_pct": 100.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 100.0, "active_speakers": 0, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28390.0, "t1": 28560.0, "p0_util_pct": 56.48, "p1_util_pct": 0.0, "total_gpu_busy_pct": 56.48, "active_speakers": 0, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28560.0, "t1": 28730.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28730.0, "t1": 28900.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28900.0, "t1": 29070.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29070.0, "t1": 29240.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29240.0, "t1": 29410.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29410.0, "t1": 29580.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29580.0, "t1": 29750.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29750.0, "t1": 29920.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29920.0, "t1": 30090.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30090.0, "t1": 30260.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30260.0, "t1": 30430.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30430.0, "t1": 30600.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30600.0, "t1": 30770.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30770.0, "t1": 30940.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30940.0, "t1": 31110.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31110.0, "t1": 31280.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31280.0, "t1": 31450.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31450.0, "t1": 31620.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31620.0, "t1": 31790.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31790.0, "t1": 31960.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31960.0, "t1": 32130.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32130.0, "t1": 32300.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32300.0, "t1": 32470.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32470.0, "t1": 32640.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32640.0, "t1": 32810.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32810.0, "t1": 32980.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32980.0, "t1": 33150.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 33150.0, "t1": 33320.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 33320.0, "t1": 33490.0, "p0_util_pct": 96.92, "p1_util_pct": 0.0, "total_gpu_busy_pct": 96.92, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 33490.0, "t1": 33660.0, "p0_util_pct": 97.88, "p1_util_pct": 0.0, "total_gpu_busy_pct": 97.88, "active_speakers": 0, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 33660.0, "t1": 33830.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 33830.0, "t1": 33992.97, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}]}, "fixed_interval": {"policy_name": "fixed_interval", "has_timeline": false, "summary": {"policy_name": "fixed_interval", "load_regime": "light", "arrival_rate_rps": 0.25, "seed": 1, "num_turns": 6, "warmup_turns": 2, "ttfs_p50_ms": 126.79, "ttfs_p95_ms": 177.83, "ttfs_mean_ms": 104.42, "ttft_p50_ms": 10.03, "ttft_p95_ms": 11.93, "slo_target_ms": 190.0, "slo_attainment_pct": 100.0, "goodput_turns_per_sec": 0.385, "goodput_tokens_per_sec": 15.84, "total_drafted_tokens": 659, "total_accepted_tokens": 44, "total_canceled_tokens": 615, "mean_acceptance_rate": 0.0668, "mean_p0_queue_wait_ms": 0.43, "timeout_count": 0, "total_sim_duration_ms": 15594.83, "by_family": {"correction": {"count": 2.0, "ttfs_p50_ms": 63.18, "ttfs_p95_ms": 110.23, "acceptance_rate": 0.0795}, "daily": {"count": 2.0, "ttfs_p50_ms": 74.9, "ttfs_p95_ms": 131.8, "acceptance_rate": 0.1389}, "entity_tracking": {"count": 2.0, "ttfs_p50_ms": 175.19, "ttfs_p95_ms": 179.94, "acceptance_rate": 0.0}}}, "aggregates": {"avg_gpu_util_pct": 5.78, "avg_p0_util_pct": 5.78, "avg_p1_util_pct": 0.0, "peak_gpu_util_pct": 100.0, "peak_speakers": 3, "peak_batch": 2, "peak_queue": 1}, "turns": [{"conversation_id": "dev_correction_slow_005#s0", "turn_id": 0, "key": "dev_correction_slow_005#s0:t0", "family": "correction", "pacing": "slow", "synthetic_revision": true, "is_warmup": true, "timed_out": false, "utterance_start_ms": 0.0, "utterance_end_ms": 8654.0, "q_end_ms": 8654.0, "ttft_end_ms": 8665.19, "ttfs_end_ms": 8686.42, "completion_ms": 8862.13, "p0_queue_wait_ms": 0.0, "ttft_ms": 11.19, "ttfs_ms": 32.42, "total_response_ms": 208.13, "drafted_tokens": 160, "accepted_tokens": 20, "canceled_tokens": 140, "acceptance_rate": 0.125, "response_text": "I don't have real-time access to flight databases, but I can guide you on how to find the information you need. You can use various travel websites and apps such as Google Flights, Skyscanner, Kayak, or the official websites", "draft_bursts": []}, {"conversation_id": "dev_correction_fast_006#s1", "turn_id": 0, "key": "dev_correction_fast_006#s1:t0", "family": "correction", "pacing": "fast", "synthetic_revision": true, "is_warmup": true, "timed_out": false, "utterance_start_ms": 11054.84, "utterance_end_ms": 16578.34, "q_end_ms": 16578.34, "ttft_end_ms": 16586.97, "ttfs_end_ms": 16593.67, "completion_ms": 16874.2, "p0_queue_wait_ms": 0.0, "ttft_ms": 8.63, "ttfs_ms": 15.33, "total_response_ms": 295.86, "drafted_tokens": 120, "accepted_tokens": 10, "canceled_tokens": 110, "acceptance_rate": 0.0833, "response_text": "Sure, I can help you set a daily alarm schedule. However, as an AI, I don't have the capability to set alarms directly on your device. You can set the alarms yourself using your phone, computer, or any other device you", "draft_bursts": []}, {"conversation_id": "dev_entity_tracking_slow_008#s2", "turn_id": 0, "key": "dev_entity_tracking_slow_008#s2:t0", "family": "entity_tracking", "pacing": "slow", "synthetic_revision": false, "is_warmup": false, "timed_out": false, "utterance_start_ms": 11755.72, "utterance_end_ms": 18022.72, "q_end_ms": 18022.72, "ttft_end_ms": 18031.38, "ttfs_end_ms": 18203.19, "completion_ms": 18392.29, "p0_queue_wait_ms": 0.0, "ttft_ms": 8.66, "ttfs_ms": 180.47, "total_response_ms": 369.57, "drafted_tokens": 120, "accepted_tokens": 0, "canceled_tokens": 120, "acceptance_rate": 0.0, "response_text": "To manage these three servers, you can use a combination of configuration management tools and orchestration platforms. Here are some options for each server based on their operating systems:\n\n1. Atlas (Ubuntu):\n   - Ansible: Ansible is a", "draft_bursts": []}, {"conversation_id": "dev_correction_fast_004#s3", "turn_id": 0, "key": "dev_correction_fast_004#s3:t0", "family": "correction", "pacing": "fast", "synthetic_revision": true, "is_warmup": false, "timed_out": false, "utterance_start_ms": 11960.21, "utterance_end_ms": 18302.41, "q_end_ms": 18304.97, "ttft_end_ms": 18313.31, "ttfs_end_ms": 18313.31, "completion_ms": 18399.78, "p0_queue_wait_ms": 2.56, "ttft_ms": 10.9, "ttfs_ms": 10.9, "total_response_ms": 97.37, "drafted_tokens": 139, "accepted_tokens": 19, "canceled_tokens": 120, "acceptance_rate": 0.1367, "response_text": "I have updated your booking to a conference room for six people at 3:30 PM tomorrow. Is there anything else I can assist you with?", "draft_bursts": []}, {"conversation_id": "dev_entity_tracking_slow_008#s2", "turn_id": 1, "key": "dev_entity_tracking_slow_008#s2:t1", "family": "entity_tracking", "pacing": "slow", "synthetic_revision": false, "is_warmup": false, "timed_out": false, "utterance_start_ms": 19122.72, "utterance_end_ms": 25465.02, "q_end_ms": 25465.02, "ttft_end_ms": 25477.04, "ttfs_end_ms": 25634.94, "completion_ms": 25826.98, "p0_queue_wait_ms": 0.0, "ttft_ms": 12.02, "ttfs_ms": 169.92, "total_response_ms": 361.96, "drafted_tokens": 120, "accepted_tokens": 0, "canceled_tokens": 120, "acceptance_rate": 0.0, "response_text": "Since Boreas is offline for maintenance, it should not receive the apt security patch until it is back online. Between Atlas and Cygnus, the host that should receive the apt security patch first would be Atlas, as it is running Ubuntu", "draft_bursts": []}, {"conversation_id": "dev_correction_fast_004#s3", "turn_id": 1, "key": "dev_correction_fast_004#s3:t1", "family": "correction", "pacing": "fast", "synthetic_revision": true, "is_warmup": false, "timed_out": false, "utterance_start_ms": 19402.41, "utterance_end_ms": 24416.11, "q_end_ms": 24416.11, "ttft_end_ms": 24423.16, "ttfs_end_ms": 24531.57, "completion_ms": 24635.29, "p0_queue_wait_ms": 0.0, "ttft_ms": 7.05, "ttfs_ms": 115.46, "total_response_ms": 219.18, "drafted_tokens": 100, "accepted_tokens": 0, "canceled_tokens": 100, "acceptance_rate": 0.0, "response_text": "I have updated the calendar invite to include the Product Design team instead of Finance. The invite has been sent to the Marketing and Product Design teams.", "draft_bursts": []}, {"conversation_id": "dev_daily_fast_000#s4", "turn_id": 0, "key": "dev_daily_fast_000#s4:t0", "family": "daily", "pacing": "fast", "synthetic_revision": false, "is_warmup": false, "timed_out": false, "utterance_start_ms": 24806.13, "utterance_end_ms": 28132.63, "q_end_ms": 28132.63, "ttft_end_ms": 28144.3, "ttfs_end_ms": 28144.3, "completion_ms": 28341.46, "p0_queue_wait_ms": 0.0, "ttft_ms": 11.67, "ttfs_ms": 11.67, "total_response_ms": 208.83, "drafted_tokens": 80, "accepted_tokens": 20, "canceled_tokens": 60, "acceptance_rate": 0.25, "response_text": "Certainly! To provide a recommendation, I would need to know your specific campus location. However, I can give you a general suggestion that you can adapt to your area:\n\n**The Nook Coffee**\n\nThe Nook Coffee is a popular choice", "draft_bursts": []}, {"conversation_id": "dev_daily_fast_000#s4", "turn_id": 1, "key": "dev_daily_fast_000#s4:t1", "family": "daily", "pacing": "fast", "synthetic_revision": false, "is_warmup": false, "timed_out": false, "utterance_start_ms": 29232.63, "utterance_end_ms": 33325.23, "q_end_ms": 33325.23, "ttft_end_ms": 33334.39, "ttfs_end_ms": 33463.35, "completion_ms": 33617.55, "p0_queue_wait_ms": 0.0, "ttft_ms": 9.16, "ttfs_ms": 138.12, "total_response_ms": 292.32, "drafted_tokens": 100, "accepted_tokens": 5, "canceled_tokens": 95, "acceptance_rate": 0.05, "response_text": "Blue Donkey Coffee typically closes at 8 PM on weekdays, but Revelator might stay open until 9 PM. It's best to check their current hours of operation on their respective websites or call them directly to confirm.", "draft_bursts": []}], "bins": [{"t0": 0.0, "t1": 170.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 170.0, "t1": 340.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 340.0, "t1": 510.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 510.0, "t1": 680.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 680.0, "t1": 850.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 850.0, "t1": 1020.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1020.0, "t1": 1190.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1190.0, "t1": 1360.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1360.0, "t1": 1530.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1530.0, "t1": 1700.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1700.0, "t1": 1870.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 1870.0, "t1": 2040.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2040.0, "t1": 2210.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2210.0, "t1": 2380.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2380.0, "t1": 2550.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2550.0, "t1": 2720.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2720.0, "t1": 2890.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 2890.0, "t1": 3060.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3060.0, "t1": 3230.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3230.0, "t1": 3400.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3400.0, "t1": 3570.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3570.0, "t1": 3740.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3740.0, "t1": 3910.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 3910.0, "t1": 4080.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4080.0, "t1": 4250.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4250.0, "t1": 4420.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4420.0, "t1": 4590.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4590.0, "t1": 4760.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4760.0, "t1": 4930.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 4930.0, "t1": 5100.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5100.0, "t1": 5270.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5270.0, "t1": 5440.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5440.0, "t1": 5610.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5610.0, "t1": 5780.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5780.0, "t1": 5950.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 5950.0, "t1": 6120.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6120.0, "t1": 6290.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6290.0, "t1": 6460.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6460.0, "t1": 6630.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6630.0, "t1": 6800.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6800.0, "t1": 6970.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 6970.0, "t1": 7140.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7140.0, "t1": 7310.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7310.0, "t1": 7480.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7480.0, "t1": 7650.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7650.0, "t1": 7820.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7820.0, "t1": 7990.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 7990.0, "t1": 8160.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 8160.0, "t1": 8330.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 8330.0, "t1": 8500.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 8500.0, "t1": 8670.0, "p0_util_pct": 9.41, "p1_util_pct": 0.0, "total_gpu_busy_pct": 9.41, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 8670.0, "t1": 8840.0, "p0_util_pct": 100.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 100.0, "active_speakers": 0, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 8840.0, "t1": 9010.0, "p0_util_pct": 13.02, "p1_util_pct": 0.0, "total_gpu_busy_pct": 13.02, "active_speakers": 0, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9010.0, "t1": 9180.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9180.0, "t1": 9350.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9350.0, "t1": 9520.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9520.0, "t1": 9690.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9690.0, "t1": 9860.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 9860.0, "t1": 10030.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10030.0, "t1": 10200.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10200.0, "t1": 10370.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10370.0, "t1": 10540.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10540.0, "t1": 10710.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10710.0, "t1": 10880.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 10880.0, "t1": 11050.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11050.0, "t1": 11220.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11220.0, "t1": 11390.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11390.0, "t1": 11560.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11560.0, "t1": 11730.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11730.0, "t1": 11900.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 11900.0, "t1": 12070.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12070.0, "t1": 12240.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12240.0, "t1": 12410.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12410.0, "t1": 12580.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12580.0, "t1": 12750.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12750.0, "t1": 12920.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 12920.0, "t1": 13090.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13090.0, "t1": 13260.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13260.0, "t1": 13430.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13430.0, "t1": 13600.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13600.0, "t1": 13770.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13770.0, "t1": 13940.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 13940.0, "t1": 14110.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14110.0, "t1": 14280.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14280.0, "t1": 14450.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14450.0, "t1": 14620.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14620.0, "t1": 14790.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14790.0, "t1": 14960.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 14960.0, "t1": 15130.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15130.0, "t1": 15300.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15300.0, "t1": 15470.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15470.0, "t1": 15640.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15640.0, "t1": 15810.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15810.0, "t1": 15980.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 15980.0, "t1": 16150.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 16150.0, "t1": 16320.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 16320.0, "t1": 16490.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 3, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 16490.0, "t1": 16660.0, "p0_util_pct": 48.04, "p1_util_pct": 0.0, "total_gpu_busy_pct": 48.04, "active_speakers": 3, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 16660.0, "t1": 16830.0, "p0_util_pct": 100.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 100.0, "active_speakers": 2, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 16830.0, "t1": 17000.0, "p0_util_pct": 26.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 26.0, "active_speakers": 2, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17000.0, "t1": 17170.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17170.0, "t1": 17340.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17340.0, "t1": 17510.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17510.0, "t1": 17680.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17680.0, "t1": 17850.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 17850.0, "t1": 18020.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 18020.0, "t1": 18190.0, "p0_util_pct": 98.4, "p1_util_pct": 0.0, "total_gpu_busy_pct": 98.4, "active_speakers": 2, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 18190.0, "t1": 18360.0, "p0_util_pct": 100.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 100.0, "active_speakers": 1, "max_batch_p0": 2, "max_batch_p1": 0, "max_queue_p0": 1, "max_queue_p1": 0}, {"t0": 18360.0, "t1": 18530.0, "p0_util_pct": 23.4, "p1_util_pct": 0.0, "total_gpu_busy_pct": 23.4, "active_speakers": 0, "max_batch_p0": 2, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 18530.0, "t1": 18700.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 18700.0, "t1": 18870.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 18870.0, "t1": 19040.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19040.0, "t1": 19210.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19210.0, "t1": 19380.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19380.0, "t1": 19550.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19550.0, "t1": 19720.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19720.0, "t1": 19890.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 19890.0, "t1": 20060.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20060.0, "t1": 20230.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20230.0, "t1": 20400.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20400.0, "t1": 20570.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20570.0, "t1": 20740.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20740.0, "t1": 20910.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 20910.0, "t1": 21080.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21080.0, "t1": 21250.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21250.0, "t1": 21420.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21420.0, "t1": 21590.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21590.0, "t1": 21760.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21760.0, "t1": 21930.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 21930.0, "t1": 22100.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22100.0, "t1": 22270.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22270.0, "t1": 22440.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22440.0, "t1": 22610.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22610.0, "t1": 22780.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22780.0, "t1": 22950.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 22950.0, "t1": 23120.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23120.0, "t1": 23290.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23290.0, "t1": 23460.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23460.0, "t1": 23630.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23630.0, "t1": 23800.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23800.0, "t1": 23970.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 23970.0, "t1": 24140.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24140.0, "t1": 24310.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24310.0, "t1": 24480.0, "p0_util_pct": 37.58, "p1_util_pct": 0.0, "total_gpu_busy_pct": 37.58, "active_speakers": 2, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24480.0, "t1": 24650.0, "p0_util_pct": 91.35, "p1_util_pct": 0.0, "total_gpu_busy_pct": 91.35, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24650.0, "t1": 24820.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24820.0, "t1": 24990.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 24990.0, "t1": 25160.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 25160.0, "t1": 25330.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 2, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 25330.0, "t1": 25500.0, "p0_util_pct": 20.58, "p1_util_pct": 0.0, "total_gpu_busy_pct": 20.58, "active_speakers": 2, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 25500.0, "t1": 25670.0, "p0_util_pct": 100.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 100.0, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 25670.0, "t1": 25840.0, "p0_util_pct": 92.34, "p1_util_pct": 0.0, "total_gpu_busy_pct": 92.34, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 25840.0, "t1": 26010.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26010.0, "t1": 26180.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26180.0, "t1": 26350.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26350.0, "t1": 26520.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26520.0, "t1": 26690.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26690.0, "t1": 26860.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 26860.0, "t1": 27030.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27030.0, "t1": 27200.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27200.0, "t1": 27370.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27370.0, "t1": 27540.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27540.0, "t1": 27710.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27710.0, "t1": 27880.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 27880.0, "t1": 28050.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28050.0, "t1": 28220.0, "p0_util_pct": 51.39, "p1_util_pct": 0.0, "total_gpu_busy_pct": 51.39, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28220.0, "t1": 28390.0, "p0_util_pct": 71.45, "p1_util_pct": 0.0, "total_gpu_busy_pct": 71.45, "active_speakers": 0, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28390.0, "t1": 28560.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28560.0, "t1": 28730.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28730.0, "t1": 28900.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 28900.0, "t1": 29070.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29070.0, "t1": 29240.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29240.0, "t1": 29410.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29410.0, "t1": 29580.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29580.0, "t1": 29750.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29750.0, "t1": 29920.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 29920.0, "t1": 30090.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30090.0, "t1": 30260.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30260.0, "t1": 30430.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30430.0, "t1": 30600.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30600.0, "t1": 30770.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30770.0, "t1": 30940.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 30940.0, "t1": 31110.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31110.0, "t1": 31280.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31280.0, "t1": 31450.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31450.0, "t1": 31620.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31620.0, "t1": 31790.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31790.0, "t1": 31960.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 31960.0, "t1": 32130.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32130.0, "t1": 32300.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32300.0, "t1": 32470.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32470.0, "t1": 32640.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32640.0, "t1": 32810.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32810.0, "t1": 32980.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 32980.0, "t1": 33150.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 33150.0, "t1": 33320.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 1, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 33320.0, "t1": 33490.0, "p0_util_pct": 96.92, "p1_util_pct": 0.0, "total_gpu_busy_pct": 96.92, "active_speakers": 1, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 33490.0, "t1": 33660.0, "p0_util_pct": 75.03, "p1_util_pct": 0.0, "total_gpu_busy_pct": 75.03, "active_speakers": 0, "max_batch_p0": 1, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 33660.0, "t1": 33830.0, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}, {"t0": 33830.0, "t1": 33992.97, "p0_util_pct": 0.0, "p1_util_pct": 0.0, "total_gpu_busy_pct": 0.0, "active_speakers": 0, "max_batch_p0": 0, "max_batch_p1": 0, "max_queue_p0": 0, "max_queue_p1": 0}]}}, "policy_order": ["no_draft", "fixed_interval"]}]}</script>
+<script>
+(function() {
+  const DATA = JSON.parse(document.getElementById("replay-data").textContent);
+  const GUTTER = 190;
+  const RPAD = 20;
+
+  const state = {
+    groupIdx: 0,
+    policy: "",
+    compare: "",
+    tMs: 0,
+    playing: false,
+    speed: 2,
+    zoom: 1,
+    viewStartMs: 0,
+    selectedKey: null,
+    lastTs: null,
+    hoverTurn: null,
+  };
+
+  const els = {
+    source: document.getElementById("hdr-source"),
+    badge: document.getElementById("mode-badge"),
+    selGroup: document.getElementById("sel-group"),
+    selPolicy: document.getElementById("sel-policy"),
+    selCompare: document.getElementById("sel-compare"),
+    btnPlay: document.getElementById("btn-play"),
+    btnReset: document.getElementById("btn-reset"),
+    btnPrev: document.getElementById("btn-prev"),
+    btnNext: document.getElementById("btn-next"),
+    selSpeed: document.getElementById("sel-speed"),
+    selZoom: document.getElementById("sel-zoom"),
+    chkFollow: document.getElementById("chk-follow"),
+    rngTime: document.getElementById("rng-time"),
+    lblClock: document.getElementById("lbl-clock"),
+    cards: document.getElementById("cards"),
+    cvLanes: document.getElementById("cv-lanes"),
+    cvGpu: document.getElementById("cv-gpu"),
+    cvLat: document.getElementById("cv-lat"),
+    inspector: document.getElementById("inspector"),
+    inspSub: document.getElementById("insp-sub"),
+    tblBody: document.getElementById("tbl-body"),
+    tblSub: document.getElementById("tbl-sub"),
+    thDelta: document.getElementById("th-delta"),
+    tooltip: document.getElementById("tooltip"),
+  };
+
+  if (DATA.source_name) els.source.textContent = "(" + DATA.source_name + ")";
+
+  function curGroup() { return DATA.groups[state.groupIdx]; }
+  function curRun() { const g = curGroup(); return g.policies[state.policy]; }
+  function cmpRun() { const g = curGroup(); return state.compare && g.policies[state.compare] ? g.policies[state.compare] : null; }
+
+  function pct(arr, p) {
+    if (!arr.length) return 0;
+    const s = [...arr].sort((a, b) => a - b);
+    const pos = (p / 100) * (s.length - 1);
+    const lo = Math.floor(pos), hi = Math.ceil(pos);
+    return lo === hi ? s[lo] : s[lo] * (1 - (pos - lo)) + s[hi] * (pos - lo);
+  }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function shortUser(u) {
+    const idx = u.indexOf("#s");
+    if (idx >= 0) return u.slice(idx) + " · " + u.slice(0, idx).replace(/^dev_|^held_out_/, "");
+    return u;
+  }
+
+  function populateGroups() {
+    els.selGroup.innerHTML = "";
+    DATA.groups.forEach((g, idx) => {
+      const opt = document.createElement("option");
+      opt.value = String(idx);
+      const rps = g.arrival_rate_rps ? ` · ${g.arrival_rate_rps} rps` : "";
+      opt.textContent = `${g.load_regime} · seed ${g.seed}${rps}`;
+      els.selGroup.appendChild(opt);
+    });
+    state.groupIdx = 0;
+    populatePolicies();
+  }
+
+  function populatePolicies() {
+    const g = curGroup();
+    els.selPolicy.innerHTML = "";
+    els.selCompare.innerHTML = '<option value="">None</option>';
+    g.policy_order.forEach(p => {
+      const o1 = document.createElement("option");
+      o1.value = p; o1.textContent = p;
+      els.selPolicy.appendChild(o1);
+      const o2 = document.createElement("option");
+      o2.value = p; o2.textContent = p;
+      els.selCompare.appendChild(o2);
+    });
+    state.policy = g.policy_order[0] || "";
+    state.compare = g.policy_order.length > 1 ? g.policy_order[1] : "";
+    els.selPolicy.value = state.policy;
+    els.selCompare.value = state.compare;
+    state.tMs = Math.min(g.t_max_ms, 0);
+    state.viewStartMs = 0;
+    state.selectedKey = (curRun() && curRun().turns[0]) ? curRun().turns[0].key : null;
+    syncScrubberRange();
+    updateAll();
+  }
+
+  function syncScrubberRange() {
+    const g = curGroup();
+    els.rngTime.max = String(Math.ceil(g.t_max_ms));
+    els.rngTime.value = String(Math.round(state.tMs));
+  }
+
+  function viewWindow() {
+    const g = curGroup();
+    const span = g.t_max_ms / state.zoom;
+    let s = state.viewStartMs;
+    if (els.chkFollow.checked && state.zoom > 1) {
+      if (state.tMs < s + span * 0.1 || state.tMs > s + span * 0.9) {
+        s = state.tMs - span * 0.25;
+      }
+    }
+    s = Math.max(0, Math.min(g.t_max_ms - span, s));
+    state.viewStartMs = s;
+    return [s, s + span];
+  }
+
+  function xFromTime(t, plotW, v0, v1) {
+    return GUTTER + ((t - v0) / Math.max(1e-6, v1 - v0)) * plotW;
+  }
+  function timeFromX(x, plotW, v0, v1) {
+    return v0 + ((x - GUTTER) / Math.max(1, plotW)) * (v1 - v0);
+  }
+
+  function setupCanvas(cv, cssH) {
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = cv.clientWidth || 900;
+    cv.style.height = cssH + "px";
+    if (cv.width !== Math.round(cssW * dpr) || cv.height !== Math.round(cssH * dpr)) {
+      cv.width = Math.round(cssW * dpr);
+      cv.height = Math.round(cssH * dpr);
+    }
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, w: cssW, h: cssH, plotW: Math.max(100, cssW - GUTTER - RPAD) };
+  }
+
+  function niceTicks(v0, v1, maxTicks) {
+    const span = Math.max(1, v1 - v0);
+    const raw = span / maxTicks;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / pow;
+    const step = norm < 1.5 ? pow : norm < 3.5 ? 2 * pow : norm < 7.5 ? 5 * pow : 10 * pow;
+    const start = Math.ceil(v0 / step) * step;
+    const ticks = [];
+    for (let t = start; t <= v1 + 1e-6; t += step) ticks.push(t);
+    return ticks;
+  }
+
+  function userStatusAt(uid, turns, tMs, hasTimeline) {
+    let seenDone = false;
+    for (const tr of turns) {
+      if (tr.conversation_id !== uid) continue;
+      if (tMs >= tr.utterance_start_ms && tMs < tr.utterance_end_ms) {
+        if (hasTimeline && (tr.draft_bursts || []).some(b => tMs >= b[0] && tMs <= b[1])) {
+          return ["DRAFTING", "#c084fc", "rgba(168,85,247,0.22)"];
+        }
+        return ["SPEAKING", "#60a5fa", "rgba(59,130,246,0.2)"];
+      }
+      if (tMs >= tr.utterance_end_ms && tMs < tr.q_end_ms) {
+        return ["QUEUED", "#fbbf24", "rgba(245,158,11,0.2)"];
+      }
+      if (tMs >= tr.q_end_ms && tMs < tr.ttft_end_ms) {
+        return ["PREFILL", "#22d3ee", "rgba(6,182,212,0.2)"];
+      }
+      if (tMs >= tr.ttft_end_ms && tMs <= tr.completion_ms) {
+        return ["DECODING", "#34d399", "rgba(16,185,129,0.2)"];
+      }
+      if (tMs > tr.completion_ms) seenDone = true;
+    }
+    return seenDone ? ["DONE", "#6ee7b7", "rgba(16,185,129,0.09)"] : ["IDLE", "#64748b", "rgba(100,116,139,0.12)"];
+  }
+
+  function findBinAt(run, tMs) {
+    if (!run || !run.bins.length) return null;
+    for (const b of run.bins) {
+      if (tMs >= b.t0 && tMs <= b.t1) return b;
+    }
+    return run.bins[run.bins.length - 1];
+  }
+
+  function renderCards() {
+    const g = curGroup();
+    const run = curRun();
+    const cmp = cmpRun();
+    const b = findBinAt(run, state.tMs);
+    const tMs = state.tMs;
+
+    let speaking = 0, onGpu = 0, queued = 0, doneCount = 0;
+    const completed = [];
+    for (const tr of run.turns) {
+      if (tMs >= tr.utterance_start_ms && tMs < tr.utterance_end_ms) speaking++;
+      if (tMs >= tr.utterance_end_ms && tMs < tr.q_end_ms) queued++;
+      if (tMs >= tr.q_end_ms && tMs <= tr.completion_ms) onGpu++;
+      if (tMs >= tr.completion_ms) { doneCount++; completed.push(tr); }
+    }
+    const steadyDone = completed.filter(x => !x.is_warmup);
+    const evalDone = steadyDone.length ? steadyDone : completed;
+    const evalLabel = steadyDone.length ? `steady (${steadyDone.length})` : (completed.length ? `warmup (${completed.length})` : "waiting");
+
+    const ttfsArr = evalDone.map(x => x.ttfs_ms);
+    const p50 = pct(ttfsArr, 50), p95 = pct(ttfsArr, 95);
+    const sloHits = evalDone.filter(x => !x.timed_out && x.ttfs_ms <= g.slo_target_ms).length;
+    const sloPct = evalDone.length ? (100 * sloHits / evalDone.length) : 0;
+
+    let cmpLine = "";
+    if (cmp) {
+      const cDone = cmp.turns.filter(x => tMs >= x.completion_ms);
+      const cSteady = cDone.filter(x => !x.is_warmup);
+      const cEval = cSteady.length ? cSteady : cDone;
+      if (cEval.length && evalDone.length) {
+        const dp50 = p50 - pct(cEval.map(x => x.ttfs_ms), 50);
+        const cls = dp50 <= 0 ? "pos" : "neg";
+        const sign = dp50 > 0 ? "+" : "";
+        cmpLine = ` · vs ${cmp.policy_name}: <span class="${cls}">${sign}${dp50.toFixed(1)} ms</span>`;
+      } else {
+        cmpLine = ` · vs ${cmp.policy_name}: pending`;
+      }
+    }
+
+    const drf = completed.reduce((a, x) => a + x.drafted_tokens, 0);
+    const acc = completed.reduce((a, x) => a + x.accepted_tokens, 0);
+    const can = completed.reduce((a, x) => a + x.canceled_tokens, 0);
+    const accRate = drf > 0 ? (100 * acc / drf).toFixed(1) + "%" : "0.0%";
+
+    const instGpu = b ? b.total_gpu_busy_pct.toFixed(1) : "0.0";
+    const instP0 = b ? b.p0_util_pct.toFixed(1) : "0.0";
+    const instP1 = b ? b.p1_util_pct.toFixed(1) : "0.0";
+    const batchNow = b ? (b.max_batch_p0 + b.max_batch_p1) : 0;
+
+    els.cards.innerHTML = `
+      <div class="card">
+        <div class="card-title">Simulation Clock</div>
+        <div class="card-val mono">${(tMs / 1000).toFixed(2)}s <span style="font-size:12px;color:var(--muted);">(${(100 * tMs / g.t_max_ms).toFixed(0)}%)</span></div>
+        <div class="card-sub">${esc(g.load_regime)} · seed ${g.seed} · cap ${g.max_batch_size}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Active Users at t</div>
+        <div class="card-val mono">${speaking} speak · ${onGpu} GPU · ${queued} wait</div>
+        <div class="card-sub">${doneCount} / ${run.turns.length} turns completed · ${g.users.length} streams</div>
+      </div>
+      <div class="card">
+        <div class="card-title">GPU Utilization</div>
+        <div class="card-val mono">${instGpu}% <span style="font-size:12px;color:var(--muted);">now</span> · ${run.aggregates.avg_gpu_util_pct.toFixed(1)}% <span style="font-size:12px;color:var(--muted);">avg</span></div>
+        <div class="card-sub">Bin P0=${instP0}% P1=${instP1}% · peak batch ${batchNow}/${g.max_batch_size}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Running TTFS (${evalLabel})</div>
+        <div class="card-val mono">${evalDone.length ? p50.toFixed(1) + " ms" : "—"} <span style="font-size:12px;color:var(--muted);">p50</span></div>
+        <div class="card-sub">p95 ${evalDone.length ? p95.toFixed(1) + " ms" : "—"} · SLO ${evalDone.length ? sloPct.toFixed(0) + "%" : "—"}${cmpLine}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Speculation Tokens (&le; t)</div>
+        <div class="card-val mono">${acc} / ${drf} <span style="font-size:12px;color:var(--muted);">(${accRate})</span></div>
+        <div class="card-sub">Canceled ${can} · Run mean wait ${run.summary.mean_p0_queue_wait_ms.toFixed(2)} ms</div>
+      </div>
+    `;
+  }
+
+  let hitBoxes = [];
+
+  function drawLanes() {
+    const g = curGroup(), run = curRun(), cmp = cmpRun();
+    const rowH = 34, topPad = 24, botPad = 10;
+    const cssH = topPad + g.users.length * rowH + botPad;
+    const { ctx, w, h, plotW } = setupCanvas(els.cvLanes, cssH);
+    const [v0, v1] = viewWindow();
+    hitBoxes = [];
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Grid & time ticks
+    const ticks = niceTicks(v0, v1, 8);
+    ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+    ctx.textAlign = "center";
+    ticks.forEach(tk => {
+      const x = xFromTime(tk, plotW, v0, v1);
+      ctx.strokeStyle = "#1e293b";
+      ctx.beginPath(); ctx.moveTo(x, topPad - 4); ctx.lineTo(x, h - botPad); ctx.stroke();
+      ctx.fillStyle = "#93a4bf";
+      ctx.fillText((tk / 1000).toFixed(1) + "s", x, 14);
+    });
+
+    const cmpMap = new Map();
+    if (cmp) cmp.turns.forEach(t => cmpMap.set(t.key, t));
+
+    g.users.forEach((uid, idx) => {
+      const y0 = topPad + idx * rowH;
+      const cy = y0 + rowH / 2;
+      ctx.fillStyle = idx % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent";
+      ctx.fillRect(0, y0, w, rowH);
+      ctx.strokeStyle = "#1e293b";
+      ctx.beginPath(); ctx.moveTo(0, y0 + rowH); ctx.lineTo(w, y0 + rowH); ctx.stroke();
+
+      // Gutter label + status pill
+      const [stText, stFg, stBg] = userStatusAt(uid, run.turns, state.tMs, run.has_timeline);
+      ctx.fillStyle = stBg;
+      ctx.fillRect(6, cy - 9, 64, 18);
+      ctx.strokeStyle = stFg;
+      ctx.strokeRect(6, cy - 9, 64, 18);
+      ctx.fillStyle = stFg;
+      ctx.font = "bold 9.5px ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(stText, 38, cy + 3);
+
+      ctx.fillStyle = "#cbd5e1";
+      ctx.font = "11.5px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(shortUser(uid), 76, cy + 4, GUTTER - 82);
+
+      // Turns for this user
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(GUTTER, y0, plotW + 6, rowH);
+      ctx.clip();
+      for (const tr of run.turns) {
+        if (tr.conversation_id !== uid) continue;
+        if (tr.completion_ms < v0 || tr.utterance_start_ms > v1) continue;
+
+        const sx = xFromTime(tr.utterance_start_ms, plotW, v0, v1);
+        const ex = xFromTime(tr.utterance_end_ms, plotW, v0, v1);
+        const qx = xFromTime(tr.q_end_ms, plotW, v0, v1);
+        const tx = xFromTime(tr.ttft_end_ms, plotW, v0, v1);
+        const fx = xFromTime(tr.ttfs_end_ms, plotW, v0, v1);
+        const cx = xFromTime(tr.completion_ms, plotW, v0, v1);
+        const barH = 18, by = cy - barH / 2;
+
+        // Speak bar
+        if (ex > GUTTER) {
+          const spX = Math.max(GUTTER, sx);
+          const spW = Math.max(2, ex - spX);
+          ctx.fillStyle = tr.is_warmup ? "rgba(59,130,246,0.34)" : "rgba(59,130,246,0.52)";
+          ctx.fillRect(spX, by, spW, barH);
+          ctx.strokeStyle = "#60a5fa";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(spX, by, spW, barH);
+        }
+
+        // P1 draft bursts overlay
+        if (run.has_timeline && tr.draft_bursts) {
+          ctx.fillStyle = "#a855f7";
+          for (const [bs, be] of tr.draft_bursts) {
+            const bx0 = Math.max(GUTTER, xFromTime(bs, plotW, v0, v1));
+            const bx1 = xFromTime(be, plotW, v0, v1);
+            if (bx1 >= GUTTER) ctx.fillRect(bx0, by + barH - 5, Math.max(2, bx1 - bx0), 5);
+          }
+        }
+
+        // Queue wait
+        if (tr.q_end_ms > tr.utterance_end_ms + 0.1 && qx > GUTTER) {
+          ctx.fillStyle = "#f59e0b";
+          ctx.fillRect(Math.max(GUTTER, ex), by, Math.max(2, qx - Math.max(GUTTER, ex)), barH);
+        }
+
+        // GPU P0 block (guarantee >= 4px visibility when zoomed out)
+        const gpuStart = Math.max(GUTTER, qx);
+        const gpuW = Math.max(4, cx - gpuStart);
+        if (cx > tx) {
+          ctx.fillStyle = "#06b6d4";
+          ctx.fillRect(gpuStart, by, Math.max(1.5, tx - gpuStart), barH);
+        }
+        const sloColor = tr.ttfs_ms <= g.slo_target_ms ? "#10b981" : "#ef4444";
+        ctx.fillStyle = sloColor;
+        const ttfsW = Math.max(2.5, fx - tx);
+        ctx.fillRect(Math.max(gpuStart, tx), by, ttfsW, barH);
+        if (cx > fx) {
+          ctx.fillStyle = "#059669";
+          ctx.fillRect(fx, by, Math.max(1, cx - fx), barH);
+        }
+
+        // Selection ring
+        const totalRight = Math.min(GUTTER + plotW + 4, Math.max(gpuStart + gpuW, cx));
+        if (tr.key === state.selectedKey) {
+          ctx.strokeStyle = "#facc15";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(Math.max(GUTTER, sx) - 1, by - 1, totalRight - Math.max(GUTTER, sx) + 2, barH + 2);
+          ctx.lineWidth = 1;
+        }
+
+        // Compare policy completion tick
+        const ctr = cmpMap.get(tr.key);
+        if (ctr) {
+          const cmpx = xFromTime(ctr.completion_ms, plotW, v0, v1);
+          if (cmpx >= GUTTER && cmpx <= w - RPAD) {
+            ctx.strokeStyle = "#c084fc";
+            ctx.beginPath(); ctx.moveTo(cmpx, by - 3); ctx.lineTo(cmpx, by + barH + 3); ctx.stroke();
+          }
+        }
+
+        // Label inside speak bar
+        const availW = ex - Math.max(GUTTER, sx);
+        if (availW > 38) {
+          ctx.fillStyle = "#eff6ff";
+          ctx.font = "10.5px ui-monospace, monospace";
+          ctx.textAlign = "left";
+          const tag = `t${tr.turn_id}${tr.synthetic_revision ? " REV" : ""}${tr.is_warmup ? " W" : ""}`;
+          ctx.fillText(tag, Math.max(GUTTER, sx) + 4, cy + 3.5, availW - 6);
+        }
+
+        hitBoxes.push({
+          x0: Math.max(GUTTER, sx),
+          x1: Math.max(totalRight, Math.max(GUTTER, sx) + 6),
+          y0: by,
+          y1: by + barH,
+          turn: tr,
+        });
+      }
+      ctx.restore();
+    });
+
+    // Playhead
+    if (state.tMs >= v0 && state.tMs <= v1) {
+      const px = xFromTime(state.tMs, plotW, v0, v1);
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(px, topPad - 6); ctx.lineTo(px, h - botPad); ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+  }
+
+  function drawGpuChart() {
+    const g = curGroup(), run = curRun(), cmp = cmpRun();
+    const topPad = 14, botPad = 22, cssH = 165;
+    const { ctx, w, h, plotW } = setupCanvas(els.cvGpu, cssH);
+    const [v0, v1] = viewWindow();
+    const chartH = h - topPad - botPad;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Y gridlines (0, 50, 100%)
+    ctx.font = "10.5px ui-monospace, monospace";
+    [0, 50, 100].forEach(val => {
+      const y = topPad + chartH * (1 - val / 100);
+      ctx.strokeStyle = "#1e293b";
+      ctx.beginPath(); ctx.moveTo(GUTTER, y); ctx.lineTo(GUTTER + plotW, y); ctx.stroke();
+      ctx.fillStyle = "#93a4bf";
+      ctx.textAlign = "right";
+      ctx.fillText(val + "%", GUTTER - 8, y + 3.5);
+    });
+
+    const maxCnt = Math.max(2, g.users.length, run.aggregates.peak_batch, run.aggregates.peak_queue);
+    ctx.fillStyle = "#64748b";
+    ctx.textAlign = "left";
+    ctx.fillText("0", GUTTER + plotW + 4, topPad + chartH + 3);
+    ctx.fillText(String(maxCnt), GUTTER + plotW + 4, topPad + 7);
+
+    // Stacked GPU bars
+    for (const b of run.bins) {
+      if (b.t1 < v0 || b.t0 > v1) continue;
+      const x0 = Math.max(GUTTER, xFromTime(b.t0, plotW, v0, v1));
+      const x1 = Math.min(GUTTER + plotW, xFromTime(b.t1, plotW, v0, v1));
+      const bw = Math.max(1, x1 - x0);
+      const h0 = (b.p0_util_pct / 100) * chartH;
+      const h1 = (b.p1_util_pct / 100) * chartH;
+      ctx.fillStyle = "rgba(16, 185, 129, 0.58)";
+      ctx.fillRect(x0, topPad + chartH - h0, bw, h0);
+      if (h1 > 0.2) {
+        ctx.fillStyle = "rgba(168, 85, 247, 0.62)";
+        ctx.fillRect(x0, topPad + chartH - h0 - h1, bw, h1);
+      }
+    }
+
+    // Compare GPU busy dashed outline
+    if (cmp) {
+      ctx.strokeStyle = "rgba(192, 132, 252, 0.75)";
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      let started = false;
+      for (const b of cmp.bins) {
+        if (b.t1 < v0 || b.t0 > v1) continue;
+        const mx = xFromTime((b.t0 + b.t1) / 2, plotW, v0, v1);
+        const my = topPad + chartH * (1 - b.total_gpu_busy_pct / 100);
+        if (!started) { ctx.moveTo(mx, my); started = true; } else ctx.lineTo(mx, my);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Concurrency lines on right axis
+    function drawCountLine(getter, color) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      let started = false;
+      for (const b of run.bins) {
+        if (b.t1 < v0 || b.t0 > v1) continue;
+        const mx = xFromTime((b.t0 + b.t1) / 2, plotW, v0, v1);
+        const my = topPad + chartH * (1 - Math.min(maxCnt, getter(b)) / maxCnt);
+        if (!started) { ctx.moveTo(mx, my); started = true; } else ctx.lineTo(mx, my);
+      }
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+    drawCountLine(b => b.active_speakers, "#3b82f6");
+    drawCountLine(b => b.max_batch_p0 + b.max_batch_p1, "#22d3ee");
+    drawCountLine(b => b.max_queue_p0 + b.max_queue_p1, "#f59e0b");
+
+    // Left panel live summary
+    const curB = findBinAt(run, state.tMs);
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "11px ui-monospace, monospace";
+    if (curB) {
+      ctx.fillText(`GPU: ${curB.total_gpu_busy_pct.toFixed(1)}%`, 8, 28);
+      ctx.fillStyle = "#34d399";
+      ctx.fillText(`P0: ${curB.p0_util_pct.toFixed(1)}%`, 8, 46);
+      ctx.fillStyle = "#c084fc";
+      ctx.fillText(`P1: ${curB.p1_util_pct.toFixed(1)}%`, 8, 64);
+      ctx.fillStyle = "#60a5fa";
+      ctx.fillText(`Speak: ${curB.active_speakers}`, 8, 86);
+      ctx.fillStyle = "#22d3ee";
+      ctx.fillText(`Batch: ${curB.max_batch_p0 + curB.max_batch_p1}/${g.max_batch_size}`, 8, 104);
+      ctx.fillStyle = "#fbbf24";
+      ctx.fillText(`Queue: ${curB.max_queue_p0 + curB.max_queue_p1}`, 8, 122);
+    }
+
+    // Playhead
+    if (state.tMs >= v0 && state.tMs <= v1) {
+      const px = xFromTime(state.tMs, plotW, v0, v1);
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(px, topPad); ctx.lineTo(px, topPad + chartH); ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+  }
+
+  let latPoints = [];
+
+  function drawLatencyChart() {
+    const g = curGroup(), run = curRun(), cmp = cmpRun();
+    const topPad = 14, botPad = 24, cssH = 165;
+    const { ctx, w, h, plotW } = setupCanvas(els.cvLat, cssH);
+    const [v0, v1] = viewWindow();
+    const chartH = h - topPad - botPad;
+    latPoints = [];
+
+    ctx.clearRect(0, 0, w, h);
+
+    let maxMs = Math.max(g.slo_target_ms * 1.25, 50);
+    for (const tr of run.turns) maxMs = Math.max(maxMs, tr.ttfs_ms * 1.12);
+    if (cmp) for (const tr of cmp.turns) maxMs = Math.max(maxMs, tr.ttfs_ms * 1.12);
+
+    ctx.font = "10.5px ui-monospace, monospace";
+    [0, 0.5, 1].forEach(frac => {
+      const val = maxMs * frac;
+      const y = topPad + chartH * (1 - frac);
+      ctx.strokeStyle = "#1e293b";
+      ctx.beginPath(); ctx.moveTo(GUTTER, y); ctx.lineTo(GUTTER + plotW, y); ctx.stroke();
+      ctx.fillStyle = "#93a4bf";
+      ctx.textAlign = "right";
+      ctx.fillText(val.toFixed(0) + "ms", GUTTER - 8, y + 3.5);
+    });
+
+    // SLO line
+    const ySlo = topPad + chartH * (1 - g.slo_target_ms / maxMs);
+    ctx.strokeStyle = "rgba(239, 68, 68, 0.75)";
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(GUTTER, ySlo); ctx.lineTo(GUTTER + plotW, ySlo); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#f87171";
+    ctx.textAlign = "left";
+    ctx.fillText(`SLO ${g.slo_target_ms}ms`, 8, Math.max(22, Math.min(topPad + chartH - 4, ySlo + 3)));
+
+    const sortedTurns = [...run.turns].sort((a, b) => a.utterance_end_ms - b.utterance_end_ms);
+
+    // Compare TTFS dashed line
+    if (cmp) {
+      const cmpSorted = [...cmp.turns].sort((a, b) => a.utterance_end_ms - b.utterance_end_ms);
+      ctx.strokeStyle = "#c084fc";
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      let started = false;
+      for (const tr of cmpSorted) {
+        if (tr.utterance_end_ms < v0 || tr.utterance_end_ms > v1) continue;
+        const x = xFromTime(tr.utterance_end_ms, plotW, v0, v1);
+        const y = topPad + chartH * (1 - tr.ttfs_ms / maxMs);
+        if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Queue wait bars
+    ctx.fillStyle = "#f59e0b";
+    for (const tr of sortedTurns) {
+      if (tr.utterance_end_ms < v0 || tr.utterance_end_ms > v1 || tr.p0_queue_wait_ms <= 0.1) continue;
+      const x = xFromTime(tr.utterance_end_ms, plotW, v0, v1);
+      const y = topPad + chartH * (1 - tr.p0_queue_wait_ms / maxMs);
+      ctx.fillRect(x - 1.5, y, 3, topPad + chartH - y);
+    }
+
+    // Main TTFS line
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.65)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let started = false;
+    for (const tr of sortedTurns) {
+      if (tr.utterance_end_ms < v0 || tr.utterance_end_ms > v1) continue;
+      const x = xFromTime(tr.utterance_end_ms, plotW, v0, v1);
+      const y = topPad + chartH * (1 - tr.ttfs_ms / maxMs);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.lineWidth = 1;
+
+    // Points
+    for (const tr of sortedTurns) {
+      if (tr.utterance_end_ms < v0 || tr.utterance_end_ms > v1) continue;
+      const x = xFromTime(tr.utterance_end_ms, plotW, v0, v1);
+      const yTtfs = topPad + chartH * (1 - tr.ttfs_ms / maxMs);
+      const yTtft = topPad + chartH * (1 - tr.ttft_ms / maxMs);
+
+      ctx.fillStyle = "#06b6d4";
+      ctx.beginPath(); ctx.arc(x, yTtft, 2.8, 0, Math.PI * 2); ctx.fill();
+
+      const col = tr.ttfs_ms <= g.slo_target_ms ? "#10b981" : "#ef4444";
+      ctx.beginPath(); ctx.arc(x, yTtfs, tr.key === state.selectedKey ? 5.5 : 4.2, 0, Math.PI * 2);
+      if (tr.is_warmup) {
+        ctx.fillStyle = "#0b101b"; ctx.fill();
+        ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.stroke(); ctx.lineWidth = 1;
+      } else {
+        ctx.fillStyle = col; ctx.fill();
+      }
+      if (tr.key === state.selectedKey) {
+        ctx.strokeStyle = "#facc15"; ctx.lineWidth = 1.8; ctx.stroke(); ctx.lineWidth = 1;
+      }
+      latPoints.push({ x, y: yTtfs, turn: tr });
+    }
+
+    // Playhead
+    if (state.tMs >= v0 && state.tMs <= v1) {
+      const px = xFromTime(state.tMs, plotW, v0, v1);
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(px, topPad); ctx.lineTo(px, topPad + chartH); ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+  }
+
+  function renderInspector() {
+    const run = curRun(), cmp = cmpRun();
+    const tr = run.turns.find(t => t.key === state.selectedKey) || run.turns[0];
+    if (!tr) { els.inspector.textContent = "No turns available."; return; }
+    state.selectedKey = tr.key;
+    els.inspSub.textContent = `${shortUser(tr.conversation_id)} · t${tr.turn_id}`;
+
+    const ctr = cmp ? cmp.turns.find(t => t.key === tr.key) : null;
+    let cmpHtml = "";
+    if (ctr) {
+      const dt = tr.ttfs_ms - ctr.ttfs_ms;
+      const cls = dt <= 0 ? "pos" : "neg";
+      const matchStr = tr.response_text === ctr.response_text
+        ? '<span class="pos">Response matches comparison verbatim</span>'
+        : '<span style="color:#fbbf24;">Response differs (e.g. batching numeric precision)</span>';
+      cmpHtml = `
+        <div class="kv"><div class="k">vs ${esc(cmp.policy_name)} TTFS</div><div class="v mono ${cls}">${dt > 0 ? "+" : ""}${dt.toFixed(1)} ms</div></div>
+        <div style="margin:6px 0;font-size:11.5px;">${matchStr}</div>
+        ${tr.response_text !== ctr.response_text ? `<div class="resp-box" style="margin-top:4px;border-color:#6d28d9;"><b>${esc(cmp.policy_name)}:</b>\n${esc(ctr.response_text)}</div>` : ""}
+      `;
+    }
+
+    els.inspector.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+        <span class="pill ${tr.ttfs_ms <= curGroup().slo_target_ms ? "ok" : "miss"}">${tr.ttfs_ms <= curGroup().slo_target_ms ? "SLO OK" : "SLO MISS"}</span>
+        <span class="badge">${esc(tr.family)} · ${esc(tr.pacing)}</span>
+        ${tr.synthetic_revision ? '<span class="badge">synthetic_revision</span>' : ""}
+        ${tr.is_warmup ? '<span class="pill warm">warmup</span>' : ""}
+      </div>
+      <div class="kv-grid">
+        <div class="kv"><div class="k">Speaking Window</div><div class="v mono">${(tr.utterance_start_ms/1000).toFixed(2)}s - ${(tr.utterance_end_ms/1000).toFixed(2)}s</div></div>
+        <div class="kv"><div class="k">P0 Queue Wait</div><div class="v mono">${tr.p0_queue_wait_ms.toFixed(2)} ms</div></div>
+        <div class="kv"><div class="k">TTFT / TTFS</div><div class="v mono">${tr.ttft_ms.toFixed(1)} / ${tr.ttfs_ms.toFixed(1)} ms</div></div>
+        <div class="kv"><div class="k">Total Response</div><div class="v mono">${tr.total_response_ms.toFixed(1)} ms</div></div>
+        <div class="kv"><div class="k">Draft Acc / Tot</div><div class="v mono">${tr.accepted_tokens} / ${tr.drafted_tokens} (${(tr.acceptance_rate*100).toFixed(1)}%)</div></div>
+        <div class="kv"><div class="k">Canceled Draft</div><div class="v mono">${tr.canceled_tokens} tok</div></div>
+      </div>
+      <div style="color:var(--muted);font-size:11px;margin-bottom:4px;"><b>${esc(run.policy_name)} Response:</b></div>
+      <div class="resp-box">${esc(tr.response_text)}</div>
+      ${cmpHtml}
+    `;
+  }
+
+  function renderTable() {
+    const g = curGroup(), run = curRun(), cmp = cmpRun();
+    els.tblSub.textContent = `${run.turns.length} turns (${run.summary.warmup_turns} warmup)`;
+    els.thDelta.textContent = cmp ? `vs ${cmp.policy_name}` : "Drafts";
+    const cmpMap = new Map();
+    if (cmp) cmp.turns.forEach(t => cmpMap.set(t.key, t));
+
+    els.tblBody.innerHTML = "";
+    for (const tr of run.turns) {
+      const row = document.createElement("tr");
+      if (tr.key === state.selectedKey) row.className = "selected";
+      const ctr = cmpMap.get(tr.key);
+      let deltaCell = `${tr.canceled_tokens} can`;
+      if (ctr) {
+        const dt = tr.ttfs_ms - ctr.ttfs_ms;
+        deltaCell = `<span class="${dt <= 0 ? "pos" : "neg"}">${dt > 0 ? "+" : ""}${dt.toFixed(1)}</span>`;
+      }
+      const statusPill = tr.is_warmup
+        ? '<span class="pill warm">warmup</span>'
+        : (tr.ttfs_ms <= g.slo_target_ms ? '<span class="pill ok">OK</span>' : '<span class="pill miss">&gt;SLO</span>');
+
+      row.innerHTML = `
+        <td class="mono">${esc(shortUser(tr.conversation_id))}</td>
+        <td class="mono">${tr.turn_id}</td>
+        <td>${esc(tr.family)}</td>
+        <td class="mono">${(tr.utterance_end_ms / 1000).toFixed(2)}</td>
+        <td class="mono">${tr.p0_queue_wait_ms.toFixed(1)}</td>
+        <td class="mono">${tr.ttft_ms.toFixed(1)}</td>
+        <td class="mono"><b>${tr.ttfs_ms.toFixed(1)}</b></td>
+        <td class="mono">${tr.total_response_ms.toFixed(1)}</td>
+        <td class="mono">${tr.accepted_tokens}/${tr.drafted_tokens}</td>
+        <td class="mono">${deltaCell}</td>
+        <td>${statusPill}</td>
+      `;
+      row.addEventListener("click", () => {
+        state.selectedKey = tr.key;
+        state.tMs = tr.utterance_end_ms;
+        state.playing = false;
+        updateAll();
+      });
+      els.tblBody.appendChild(row);
+    }
+  }
+
+  function updateClockAndBadge() {
+    const g = curGroup(), run = curRun();
+    els.btnPlay.textContent = state.playing ? "Pause" : "Play";
+    els.lblClock.textContent = `${(state.tMs / 1000).toFixed(2)} / ${(g.t_max_ms / 1000).toFixed(2)} s`;
+    els.rngTime.value = String(Math.round(state.tMs));
+    if (run.has_timeline) {
+      els.badge.className = "badge full";
+      els.badge.textContent = "FULL TIMELINE MODE (Exact P0 + P1 GPU steps)";
+    } else {
+      els.badge.className = "badge turn";
+      els.badge.textContent = "TURN-ONLY MODE (Exact P0 GPU occupancy; P1 steps omitted in older runs)";
+    }
+  }
+
+  function redrawDynamic() {
+    updateClockAndBadge();
+    renderCards();
+    drawLanes();
+    drawGpuChart();
+    drawLatencyChart();
+  }
+
+  function updateAll() {
+    redrawDynamic();
+    renderInspector();
+    renderTable();
+  }
+
+  // Tooltip + canvas scrubbing / turn click
+  function showTip(evt, htmlStr) {
+    els.tooltip.innerHTML = htmlStr;
+    els.tooltip.style.display = "block";
+    els.tooltip.style.left = Math.min(window.innerWidth - 380, evt.clientX + 14) + "px";
+    els.tooltip.style.top = Math.min(window.innerHeight - 160, evt.clientY + 14) + "px";
+  }
+  function hideTip() { els.tooltip.style.display = "none"; }
+
+  function bindCanvasScrub(cv, kind) {
+    let dragging = false, panStartX = 0, panView0 = 0;
+    cv.addEventListener("mousedown", (e) => {
+      const rect = cv.getBoundingClientRect();
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      if (kind === "lanes") {
+        const hit = hitBoxes.find(b => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1);
+        if (hit) {
+          state.selectedKey = hit.turn.key;
+          state.tMs = hit.turn.utterance_end_ms;
+          state.playing = false;
+          updateAll();
+          return;
+        }
+      } else if (kind === "lat") {
+        const hit = latPoints.find(p => Math.hypot(p.x - x, p.y - y) <= 8);
+        if (hit) {
+          state.selectedKey = hit.turn.key;
+          state.tMs = hit.turn.utterance_end_ms;
+          state.playing = false;
+          updateAll();
+          return;
+        }
+      }
+      dragging = true;
+      panStartX = x;
+      panView0 = state.viewStartMs;
+      if (!e.shiftKey) {
+        const plotW = Math.max(100, cv.clientWidth - GUTTER - RPAD);
+        const [v0, v1] = viewWindow();
+        if (x >= GUTTER) {
+          state.tMs = Math.max(0, Math.min(curGroup().t_max_ms, timeFromX(x, plotW, v0, v1)));
+          redrawDynamic();
+        }
+      }
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      const rect = cv.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const plotW = Math.max(100, cv.clientWidth - GUTTER - RPAD);
+      const [v0, v1] = viewWindow();
+      if (e.shiftKey && state.zoom > 1) {
+        const dx = x - panStartX;
+        const dt = (dx / plotW) * (v1 - v0);
+        state.viewStartMs = Math.max(0, Math.min(curGroup().t_max_ms - (v1 - v0), panView0 - dt));
+      } else if (x >= GUTTER) {
+        state.tMs = Math.max(0, Math.min(curGroup().t_max_ms, timeFromX(x, plotW, v0, v1)));
+      }
+      redrawDynamic();
+    });
+    window.addEventListener("mouseup", () => { dragging = false; });
+
+    cv.addEventListener("mousemove", (e) => {
+      if (dragging) return;
+      const rect = cv.getBoundingClientRect();
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      if (x < GUTTER) { hideTip(); return; }
+      const plotW = Math.max(100, cv.clientWidth - GUTTER - RPAD);
+      const [v0, v1] = viewWindow();
+      const tHover = timeFromX(x, plotW, v0, v1);
+
+      if (kind === "lanes") {
+        const hit = hitBoxes.find(b => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1);
+        if (hit) {
+          const t = hit.turn;
+          showTip(e, `<b>${esc(t.conversation_id)} (t${t.turn_id})</b><br>` +
+            `${esc(t.family)} · ${esc(t.pacing)} ${t.is_warmup ? "· WARMUP" : ""}<br>` +
+            `Speak: ${(t.utterance_start_ms/1000).toFixed(2)}s - ${(t.utterance_end_ms/1000).toFixed(2)}s<br>` +
+            `Wait: <b>${t.p0_queue_wait_ms.toFixed(1)} ms</b> · TTFT: ${t.ttft_ms.toFixed(1)} ms<br>` +
+            `TTFS: <b>${t.ttfs_ms.toFixed(1)} ms</b> · Total: ${t.total_response_ms.toFixed(1)} ms<br>` +
+            `Drafts: ${t.accepted_tokens}/${t.drafted_tokens} acc · ${t.canceled_tokens} canceled`);
+        } else {
+          showTip(e, `t = <b>${(tHover/1000).toFixed(2)} s</b> (${tHover.toFixed(0)} ms)`);
+        }
+      } else if (kind === "gpu") {
+        const b = findBinAt(curRun(), tHover);
+        if (b) {
+          showTip(e, `<b>Window ${(b.t0/1000).toFixed(2)}s - ${(b.t1/1000).toFixed(2)}s</b><br>` +
+            `Total GPU Busy: <b>${b.total_gpu_busy_pct.toFixed(1)}%</b> (P0 ${b.p0_util_pct.toFixed(1)}%, P1 ${b.p1_util_pct.toFixed(1)}%)<br>` +
+            `Peak Speakers: ${b.active_speakers} · Batch: ${b.max_batch_p0}+${b.max_batch_p1} · Queue: ${b.max_queue_p0}`);
+        }
+      } else if (kind === "lat") {
+        const hit = latPoints.find(p => Math.hypot(p.x - x, p.y - y) <= 8);
+        if (hit) {
+          const t = hit.turn;
+          showTip(e, `<b>${esc(shortUser(t.conversation_id))} t${t.turn_id}</b><br>` +
+            `TTFS: <b>${t.ttfs_ms.toFixed(1)} ms</b> · TTFT: ${t.ttft_ms.toFixed(1)} ms · Wait: ${t.p0_queue_wait_ms.toFixed(1)} ms`);
+        } else {
+          hideTip();
+        }
+      }
+    });
+    cv.addEventListener("mouseleave", hideTip);
+  }
+
+  bindCanvasScrub(els.cvLanes, "lanes");
+  bindCanvasScrub(els.cvGpu, "gpu");
+  bindCanvasScrub(els.cvLat, "lat");
+
+  els.selGroup.addEventListener("change", () => { state.groupIdx = Number(els.selGroup.value); state.playing = false; populatePolicies(); });
+  els.selPolicy.addEventListener("change", () => { state.policy = els.selPolicy.value; updateAll(); });
+  els.selCompare.addEventListener("change", () => { state.compare = els.selCompare.value; updateAll(); });
+  els.selSpeed.addEventListener("change", () => { state.speed = Number(els.selSpeed.value); });
+  els.selZoom.addEventListener("change", () => { state.zoom = Number(els.selZoom.value); redrawDynamic(); });
+  els.rngTime.addEventListener("input", () => { state.tMs = Number(els.rngTime.value); state.playing = false; redrawDynamic(); });
+
+  els.btnPlay.addEventListener("click", () => {
+    if (state.tMs >= curGroup().t_max_ms - 1) state.tMs = 0;
+    state.playing = !state.playing;
+    state.lastTs = null;
+    redrawDynamic();
+  });
+  els.btnReset.addEventListener("click", () => { state.playing = false; state.tMs = 0; state.viewStartMs = 0; redrawDynamic(); });
+
+  function stepTurn(delta) {
+    const turns = [...curRun().turns].sort((a, b) => a.utterance_end_ms - b.utterance_end_ms);
+    if (!turns.length) return;
+    let idx = turns.findIndex(t => t.key === state.selectedKey);
+    idx = idx < 0 ? 0 : Math.max(0, Math.min(turns.length - 1, idx + delta));
+    state.selectedKey = turns[idx].key;
+    state.tMs = turns[idx].utterance_end_ms;
+    state.playing = false;
+    updateAll();
+  }
+  els.btnPrev.addEventListener("click", () => stepTurn(-1));
+  els.btnNext.addEventListener("click", () => stepTurn(1));
+
+  window.addEventListener("keydown", (e) => {
+    if (e.target && ["SELECT", "INPUT"].includes(e.target.tagName)) return;
+    if (e.code === "Space") { e.preventDefault(); els.btnPlay.click(); }
+    else if (e.key === "[") stepTurn(-1);
+    else if (e.key === "]") stepTurn(1);
+  });
+  window.addEventListener("resize", redrawDynamic);
+
+  function tick(ts) {
+    if (state.playing) {
+      if (state.lastTs !== null) {
+        const dt = Math.min(100, ts - state.lastTs) * state.speed;
+        state.tMs += dt;
+        const tMax = curGroup().t_max_ms;
+        if (state.tMs >= tMax) { state.tMs = tMax; state.playing = false; }
+      }
+      state.lastTs = ts;
+      redrawDynamic();
+    } else {
+      state.lastTs = null;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  populateGroups();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

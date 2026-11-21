@@ -78,6 +78,23 @@ class TurnCompletionRecord:
     response_text: str
 
 
+@dataclass
+class StepRecord:
+    """Single GPU execution step emitted when ``PriorityGateway(record_trace=True)``."""
+
+    start_ms: float
+    end_ms: float
+    step_ms: float
+    kind: str
+    p0_active: int
+    p1_active: int
+    p0_queue_len: int
+    p1_queue_len: int
+    max_batch_size: int
+    p0_convs: List[str]
+    p1_convs: List[str]
+
+
 class PriorityGateway:
     """Gateway enforcing P0 > P1 priority, <=1 active draft/conv, and greedy verification."""
 
@@ -89,6 +106,7 @@ class PriorityGateway:
         max_new_tokens: int = 48,
         min_sentence_tokens: int = 4,
         sentence_fallback_tokens: int = 24,
+        record_trace: bool = False,
     ) -> None:
         self.engine = engine
         self.controller = controller
@@ -96,6 +114,8 @@ class PriorityGateway:
         self.max_new_tokens = int(max_new_tokens)
         self.min_sentence_tokens = int(min_sentence_tokens)
         self.sentence_fallback_tokens = int(sentence_fallback_tokens)
+        self.record_trace = bool(record_trace)
+        self.step_trace: List[StepRecord] = []
 
         self.conversations: Dict[str, ConversationState] = {}
         self._turn_drafted_counts: Dict[Tuple[str, int], int] = {}
@@ -331,6 +351,33 @@ class PriorityGateway:
             evicted = self.p1_decoding.pop()
             evicted.canceled = True
 
+    def _record_step(
+        self,
+        start_ms: float,
+        end_ms: float,
+        step_ms: float,
+        kind: str,
+        p0_convs: List[str],
+        p1_convs: List[str],
+    ) -> None:
+        if not self.record_trace:
+            return
+        self.step_trace.append(
+            StepRecord(
+                start_ms=start_ms,
+                end_ms=end_ms,
+                step_ms=step_ms,
+                kind=kind,
+                p0_active=len(p0_convs),
+                p1_active=len(p1_convs),
+                p0_queue_len=len(self.p0_waiting_prefill),
+                p1_queue_len=len(self.p1_waiting_prefill),
+                max_batch_size=self.max_batch_size,
+                p0_convs=p0_convs,
+                p1_convs=p1_convs,
+            )
+        )
+
     def step(self, now_ms: float) -> Tuple[float, List[TurnCompletionRecord]]:
         """Execute one GPU scheduling step and return ``(step_ms, completions)``."""
         completions: List[TurnCompletionRecord] = []
@@ -366,6 +413,14 @@ class PriorityGateway:
 
                 end_ms = now_ms + step_ms
                 self._recent_step_ms = step_ms
+                self._record_step(
+                    start_ms=now_ms,
+                    end_ms=end_ms,
+                    step_ms=step_ms,
+                    kind="p0_verify" if req.draft_tokens else "p0_prefill",
+                    p0_convs=[f"{req.conversation_id}:t{req.turn_id}"],
+                    p1_convs=[],
+                )
                 self._check_sentence_and_ttft(req, end_ms)
                 if req.seq_state.finished:
                     completions.append(self._finalize_foreground_request(req, end_ms))
@@ -390,6 +445,14 @@ class PriorityGateway:
             draft_req.seq_state = seq_state
             step_ms = max(0.1, prefill_ms)
             self._recent_step_ms = step_ms
+            self._record_step(
+                start_ms=now_ms,
+                end_ms=now_ms + step_ms,
+                step_ms=step_ms,
+                kind="p1_prefill",
+                p0_convs=[],
+                p1_convs=[f"{draft_req.conversation_id}:t{draft_req.turn_id}"],
+            )
 
             conv = self.conversations.get(draft_req.conversation_id)
             key = (draft_req.conversation_id, draft_req.turn_id)
@@ -423,6 +486,14 @@ class PriorityGateway:
         step_ms = max(0.1, step_ms)
         self._recent_step_ms = step_ms
         end_ms = now_ms + step_ms
+        self._record_step(
+            start_ms=now_ms,
+            end_ms=end_ms,
+            step_ms=step_ms,
+            kind="decode",
+            p0_convs=[f"{r.conversation_id}:t{r.turn_id}" for r in p0_active],
+            p1_convs=[f"{d.conversation_id}:t{d.turn_id}" for d in p1_active],
+        )
 
         # Update P0 requests
         still_p0: List[_ForegroundRequest] = []

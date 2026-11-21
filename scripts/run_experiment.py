@@ -6,7 +6,7 @@ import argparse
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Any, Dict, List, Sequence
 
 import numpy as np
 
@@ -24,6 +24,7 @@ from src.simulator import (
     TurnMetrics,
     generate_workload_schedule,
     save_summaries_json,
+    save_timeline_jsonl,
     save_turn_metrics_jsonl,
 )
 
@@ -88,6 +89,11 @@ def main() -> None:
     parser.add_argument("--max_batch_size", type=int, default=8)
     parser.add_argument("--slo_target_ms", type=float, default=190.0)
     parser.add_argument("--output_dir", default=str(PROJECT_ROOT / "results"))
+    parser.add_argument(
+        "--no_timeline",
+        action="store_true",
+        help="Disable step-level GPU timeline JSONL output.",
+    )
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir)
@@ -115,6 +121,7 @@ def main() -> None:
         slo_target_ms=args.slo_target_ms,
         max_batch_size=args.max_batch_size,
         warmup_turns=args.warmup_turns,
+        record_timeline=not args.no_timeline,
     )
 
     policies = _parse_csv(args.policies)
@@ -123,6 +130,7 @@ def main() -> None:
 
     all_metrics: List[TurnMetrics] = []
     all_summaries: List[RunSummary] = []
+    all_timeline: List[Dict[str, Any]] = []
 
     for load_name in loads:
         if load_name not in DEFAULT_LOAD_RATES_RPS:
@@ -146,6 +154,8 @@ def main() -> None:
                 )
                 all_metrics.extend(metrics)
                 all_summaries.append(summary)
+                if harness.last_timeline:
+                    all_timeline.extend(harness.last_timeline)
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -157,6 +167,10 @@ def main() -> None:
     print("\n" + _format_table(all_summaries))
     print(f"\nSaved turn metrics to {turns_path}")
     print(f"Saved summaries to    {summary_path}")
+    if all_timeline:
+        timeline_path = out_dir / f"timeline_{args.mode}_{args.split}.jsonl"
+        save_timeline_jsonl(all_timeline, timeline_path)
+        print(f"Saved timeline to     {timeline_path}")
 
 
 if __name__ == "__main__":

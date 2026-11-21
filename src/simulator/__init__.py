@@ -5,6 +5,7 @@ from src.simulator.harness import (
     RunSummary,
     TurnMetrics,
     save_summaries_json,
+    save_timeline_jsonl,
     save_turn_metrics_jsonl,
 )
 from src.simulator.workload import (
@@ -21,5 +22,6 @@ __all__ = [
     "RunSummary",
     "TurnMetrics",
     "save_summaries_json",
+    "save_timeline_jsonl",
     "save_turn_metrics_jsonl",
 ]

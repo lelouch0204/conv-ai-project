@@ -91,6 +91,7 @@ class ReplayHarness:
         max_batch_size: int = 8,
         max_new_tokens: int = 48,
         warmup_turns: int = 0,
+        record_timeline: bool = False,
     ) -> None:
         self.engine = engine
         self.slo_target_ms = float(slo_target_ms)
@@ -98,6 +99,8 @@ class ReplayHarness:
         self.max_batch_size = int(max_batch_size)
         self.max_new_tokens = int(max_new_tokens)
         self.warmup_turns = max(0, int(warmup_turns))
+        self.record_timeline = bool(record_timeline)
+        self.last_timeline: List[Dict[str, Any]] = []
 
     def run(
         self,
@@ -113,6 +116,7 @@ class ReplayHarness:
             controller=controller,
             max_batch_size=self.max_batch_size,
             max_new_tokens=self.max_new_tokens,
+            record_trace=self.record_timeline,
         )
 
         # Build min-heap of (event_time_ms, seq_id, event_kind, payload)
@@ -193,6 +197,28 @@ class ReplayHarness:
                 completions.extend(newly_completed)
             elif event_heap:
                 now_ms = event_heap[0][0]
+
+        if self.record_timeline:
+            self.last_timeline = [
+                {
+                    "policy_name": controller.name,
+                    "load_regime": load_regime,
+                    "seed": seed,
+                    "t0": round(s.start_ms, 3),
+                    "dt": round(s.step_ms, 3),
+                    "k": s.kind,
+                    "p0": s.p0_active,
+                    "p1": s.p1_active,
+                    "q0": s.p0_queue_len,
+                    "q1": s.p1_queue_len,
+                    "cap": s.max_batch_size,
+                    "c0": s.p0_convs,
+                    "c1": s.p1_convs,
+                }
+                for s in gateway.step_trace
+            ]
+        else:
+            self.last_timeline = []
 
         turn_metrics: List[TurnMetrics] = []
         for idx, rec in enumerate(completions):
@@ -344,16 +370,28 @@ class ReplayHarness:
         )
 
 
+def _write_jsonl(rows: Sequence[Dict[str, Any]], path: Union[str, Path]) -> None:
+    out_path = Path(path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", encoding="utf-8") as fh:
+        for row in rows:
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
 def save_turn_metrics_jsonl(
     metrics: Sequence[TurnMetrics],
     path: Union[str, Path],
 ) -> None:
     """Persist turn-level telemetry records as JSONL."""
-    out_path = Path(path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w", encoding="utf-8") as fh:
-        for row in metrics:
-            fh.write(json.dumps(row.to_dict(), ensure_ascii=False) + "\n")
+    _write_jsonl([row.to_dict() for row in metrics], path)
+
+
+def save_timeline_jsonl(
+    events: Sequence[Dict[str, Any]],
+    path: Union[str, Path],
+) -> None:
+    """Persist GPU step-level timeline records as JSONL."""
+    _write_jsonl(list(events), path)
 
 
 def save_summaries_json(
