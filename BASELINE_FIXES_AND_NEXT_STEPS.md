@@ -16,9 +16,10 @@ every policy produces the same final-prompt greedy answer. Correct scheduling
 logic alone does not establish a correct or fair experiment.
 
 The fixes and two additional controllers are committed and deployed on PACE-ICE.
-All 20 CPU tests pass locally and on PACE. The mock sweep and bounded H100 GPU
-runs pass output and accounting checks. Section 10 records the exact GPU
-validation scope; historical GPU artifacts have been preserved unchanged.
+All 20 CPU tests pass locally and on PACE. The mock sweep, bounded H100 runs,
+and sampled float32 RTX runs pass output and accounting checks. The broader
+float16 RTX sweep fails output equivalence and is retained as diagnostic data.
+Sections 10 and 12 record the exact scope; historical artifacts are unchanged.
 
 ## 1. Evidence from the original experiments
 
@@ -293,6 +294,48 @@ repeat-run instructions. The remote checkout additionally contains
    ASR/TTS. Dashboard occupancy is a scheduling proxy, not hardware utilization.
 6. Add semantic/edit ablations, actual benchmark ingestion, frozen held-out
    comparisons with variability, and an interactive multi-turn quality audit.
+
+## 12. RTX 6000 follow-up: precision is a material constraint
+
+The requested RTX collection used actual Quadro RTX 6000 GPUs (capability 7.5),
+the same checkpoint revision, and unchanged benchmark code at commit `a17a423`.
+Batch-invariant mode is unsupported on this capability and was disabled.
+
+| Job | Configuration and scope | Exact-output outcome |
+| --- | --- | --- |
+| 7226325 | CUDA/float16 compatibility probe | Passed |
+| 7226385 | Float16, light, eight turns per policy | 32 checked; passed |
+| 7226493 | Float16, three loads and three seeds, 16 turns per policy/run | 576 checked; 73 reference mismatches, 35 paired mismatches |
+| 7226802 | Targeted same-prefix numerical diagnostic | Reproduces different next tokens at batch sizes 1 and 2 |
+| 7226964 | Float32, light, 16 turns per policy | 64 checked; passed |
+| 7227173 | Float32, three loads and one seed, 16 turns per policy/run | 192 checked; passed |
+
+The float16 sweep completed all timed conditions, but the output gate exited
+nonzero as intended. It has zero warmup-pairing or accounting errors. Twelve of
+the 73 reference disagreements occur in NoDraft itself, so this is not solely a
+draft-acceptance problem. These counts do not measure semantic task accuracy.
+
+In the diagnostic example, ordinary single-sequence decoding chooses
+`invitation`, while batch size 2 and parallel prompt scoring choose `meeting`
+after the same five response-prefix tokens. The preserved scores establish
+observed numerical batch/path dependence without proving which operation
+introduces it. A small smoke test passing cannot establish the broader claim.
+
+Float32 retains the same GPU and checkpoint but changes numerical precision,
+memory use, and service speed. It passes the sampled checks; it is not evidence
+that float16 was fixed or that arbitrary prompts are batch invariant. Its
+three-load pilot shows only a small light-load median benefit from the adaptive
+controller, while NoDraft retains the better tail. The offered rates are not
+calibrated to float32 capacity, and its intermediate/heavy median latencies are
+several seconds. This is pilot evidence, not a deployable voice configuration.
+
+All data, including failures and the 5.12-second float16 decode outlier, are
+retained. Total RTX allocation was 0.7164 GPU-hours including probes, diagnostics,
+and warmup. See the separate RTX section in [`README.md`](README.md),
+[`rtx_collection.json`](results/pace_ice/rtx6000_setup/rtx_collection.json), and
+the raw manifests/validation reports under [`results/pace_ice/`](results/pace_ice/).
+The new `scripts/summarize_results.py` reports per-seed mean/sample SD and prints
+the validation status; it does not make failed-output runs valid.
 
 ## Reproduction commands
 

@@ -147,6 +147,91 @@ Artifacts and receipts are in [`results/pace_ice/`](results/pace_ice/): full tur
 logs, timelines, reference checks, manifests, HTML replays, CPU test log, pinned
 model metadata, and Slurm accounting. The tested code commit is `239c2ea`.
 
+## RTX 6000 collection (November 21, 2026)
+
+These additional jobs explicitly requested **Quadro RTX 6000**, reporting 23,040
+MiB and compute capability 7.5. They use the same checkpoint revision and serving
+code, with precision recorded separately. Batch invariance is disabled because
+[vLLM requires capability 8.0 or newer](https://docs.vllm.ai/en/stable/features/batch_invariance/#hardware-requirements).
+The complete collection, including compatibility/diagnostic jobs, used 0.7164
+allocated RTX GPU-hours. No H100 was used for these jobs.
+
+### Float16: collected, but output equivalence fails
+
+Job 7226493 ran four policies, three loads, and three workload seeds, with 16
+turns per run and four excluded as warmup: 576 responses checked and 432 turns
+evaluated for latency. All 36 timed conditions finished, but the strict output
+gate correctly exited nonzero and marked the artifacts `invalid_outputs`:
+
+- 73/576 responses disagree with the direct greedy reference: NoDraft 12,
+  FixedInterval 20, LoadReuseAdaptive 20, and ReuseOnly 21.
+- 35/432 paired comparisons disagree with NoDraft.
+- Warmup pairing and draft accounting have zero errors.
+
+These are token-equivalence failures, not measurements of semantic accuracy.
+Do not use these latencies as a controlled equivalent-output comparison. The
+three-seed means/SDs are retained as diagnostic profiling data in
+[`rtx6000_pilot_7226493/aggregate_summary.json`](results/pace_ice/rtx6000_pilot_7226493/aggregate_summary.json).
+The earlier eight-turn-per-policy smoke job 7226385 passed; that smaller sample
+did not establish correctness for the broader sweep.
+
+Diagnostic job 7226802 reproduces the same-prefix issue: at the sixth response
+token, batch size 1 selects `invitation` (ID 43579), while batch size 2 selects
+`meeting` (ID 9176). Parallel prompt scoring also selects `meeting`, even though
+the single-sequence reference selects `invitation`. This establishes observed
+batch/path dependence in this float16 configuration; it does not isolate a
+particular kernel defect. The script, scores, and examples are preserved in
+[`rtx6000_setup/`](results/pace_ice/rtx6000_setup/).
+
+There were no Triton attention JIT warnings after the first measured-run cache
+reset. The float16 timeline nevertheless contains a 5.12-second decode call in
+intermediate load, seed 3, FixedInterval. It is retained and contributes to the
+large variation; its cause has not been established.
+
+### Float32: sampled output checks pass, with a large latency cost
+
+Float32 light-load check 7226964 passes 64/64 responses. Three-load pilot
+7227173 passes 192/192 responses and all 144 paired comparisons. The latter uses
+one workload seed and 12 evaluated turns per policy/load after warmup:
+
+| Policy | Light p50 / p95 (s) | Intermediate p50 / p95 (s) | Heavy p50 / p95 (s) |
+| --- | ---: | ---: | ---: |
+| `no_draft` | 1.882 / 3.817 | 8.339 / 11.639 | 9.090 / 12.315 |
+| `fixed_interval` | 3.543 / 5.149 | 8.816 / 13.192 | 11.323 / 14.134 |
+| `load_reuse_adaptive` | 1.732 / 3.984 | 8.409 / 11.694 | 9.188 / 12.343 |
+| `reuse_only` | 3.522 / 4.979 | 8.932 / 13.135 | 11.297 / 14.108 |
+
+The controller limits naive drafting's latency cost, but does not uniformly beat
+NoDraft. Float32 is a separate, slower configuration, not a repair or relabeling
+of float16 results. Its load rates were not recalibrated for its service speed;
+the high latencies are not evidence of deployable voice performance. Passing
+this finite sample does not establish universal numerical invariance, quality,
+or held-out performance. Do not pool different precisions or compare these
+numbers with H100 to attribute a pure hardware speedup.
+
+Repeat the sampled float32 RTX pilot on the prepared PACE account:
+
+```bash
+cd ~/scratch/conv-ai-project
+source results/pace_ice/rtx6000_setup/activate_rtx_float32.sh
+LOADS=light,intermediate,heavy TARGET_TURNS=16 WARMUP_TURNS=4 SEEDS=1 \
+  sbatch --partition=ice-gpu --gres=gpu:rtx_6000:1 scripts/run_pilot.sbatch
+```
+
+For the float16 reproduction use `activate_rtx.sh` in the same directory and
+`SEEDS=1,2,3`; expect equivalence checks to fail for the recorded configuration.
+The complete receipt and accounting are in
+[`rtx_collection.json`](results/pace_ice/rtx6000_setup/rtx_collection.json).
+Produce the per-seed aggregation table without NumPy or a GPU:
+
+```bash
+python scripts/summarize_results.py results/pace_ice/rtx6000_pilot_7226493/summaries_vllm_dev.json
+```
+
+This prints the failed validation status alongside the statistics. Means and
+sample SDs describe per-seed quantiles, not pooled turn percentiles. The float32
+pilot has one seed, so its SD is deliberately null rather than reported as zero.
+
 ## Interpretation and remaining limitations
 
 The original GPU results are unchanged. Their summaries agree with their logs,
@@ -196,6 +281,6 @@ allocated GPU-hours. `results/review/mock_dev/` contains CPU simulation only.
 
 OpenAI Codex assisted with code review, implementation, regression tests, and
 CPU mock-run analysis, PACE deployment, and GPU pilot execution. CPU tests and
-artifact/reference checks were executed, including the bounded H100 runs above.
+artifact/reference checks were executed, including the H100 and RTX trials above.
 Team members must review the implementation and GPU results, and record their
 own contributions and disclosures for submission.

@@ -1,0 +1,26 @@
+---------------------------------------
+Begin Slurm Prolog: Nov-21-2026 13:29:07
+Job ID:    7226325
+User ID:   vmohanty7
+Account:   ece
+Job name:  conv-ai-rtx-probe
+Partition: ice-gpu
+QOS:       coe-ice
+---------------------------------------
+Quadro RTX 6000, 23040 MiB, 7.5, 580.178.04
+torch 2.14.0+cu130 CUDA 13.0
+compiled arches ['sm_75', 'sm_80', 'sm_86', 'sm_90', 'sm_100', 'sm_120']
+device Quadro RTX 6000 capability (7, 5)
+float16 matmul 32.0
+---------------------------------------
+Begin Slurm Epilog: Nov-21-2026 13:30:27
+Job ID:        7226325
+User ID:       vmohanty7
+Account:       ece
+Job name:      conv-ai-rtx-probe
+Resources:     cpu=2,gres/gpu:rtx_6000=1,mem=8G,node=1
+Rsrc Used:     cput=00:02:42,vmem=0,walltime=00:01:21,mem=871164K,energy_used=0
+Partition:     ice-gpu
+QOS:           coe-ice
+Nodes:         atl1-1-01-005-5-0
+---------------------------------------

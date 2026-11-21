@@ -1,0 +1,343 @@
+{
+  "source": "results/pace_ice/rtx6000_pilot_7226493/summaries_vllm_dev.json",
+  "output_validation": "failed_or_unvalidated",
+  "aggregation": "Mean and sample SD of per-seed run quantiles; not pooled turn quantiles. SD is null for one run.",
+  "groups": [
+    {
+      "load_regime": "light",
+      "policy_name": "no_draft",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 562.22,
+        "sample_sd": 48.632
+      },
+      "ttfs_p95_ms": {
+        "mean": 874.987,
+        "sample_sd": 212.805
+      },
+      "slo_attainment_pct": {
+        "mean": 8.33,
+        "sample_sd": 0.0
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 2.393,
+        "sample_sd": 2.09
+      },
+      "overall_draft_acceptance_rate": 0.0
+    },
+    {
+      "load_regime": "light",
+      "policy_name": "fixed_interval",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 663.017,
+        "sample_sd": 68.85
+      },
+      "ttfs_p95_ms": {
+        "mean": 1018.897,
+        "sample_sd": 99.952
+      },
+      "slo_attainment_pct": {
+        "mean": 16.67,
+        "sample_sd": 0.0
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 11.07,
+        "sample_sd": 5.221
+      },
+      "overall_draft_acceptance_rate": 0.05339652448657188
+    },
+    {
+      "load_regime": "light",
+      "policy_name": "load_reuse_adaptive",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 483.89,
+        "sample_sd": 53.309
+      },
+      "ttfs_p95_ms": {
+        "mean": 884.287,
+        "sample_sd": 259.28
+      },
+      "slo_attainment_pct": {
+        "mean": 16.67,
+        "sample_sd": 0.0
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 7.77,
+        "sample_sd": 2.934
+      },
+      "overall_draft_acceptance_rate": 0.11857018308631212
+    },
+    {
+      "load_regime": "light",
+      "policy_name": "reuse_only",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 575.207,
+        "sample_sd": 129.307
+      },
+      "ttfs_p95_ms": {
+        "mean": 987.01,
+        "sample_sd": 100.383
+      },
+      "slo_attainment_pct": {
+        "mean": 16.67,
+        "sample_sd": 0.0
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 6.3,
+        "sample_sd": 1.672
+      },
+      "overall_draft_acceptance_rate": 0.08351769911504425
+    },
+    {
+      "load_regime": "intermediate",
+      "policy_name": "no_draft",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 862.897,
+        "sample_sd": 101.407
+      },
+      "ttfs_p95_ms": {
+        "mean": 1222.083,
+        "sample_sd": 88.872
+      },
+      "slo_attainment_pct": {
+        "mean": 5.553,
+        "sample_sd": 4.809
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 17.807,
+        "sample_sd": 2.85
+      },
+      "overall_draft_acceptance_rate": 0.0
+    },
+    {
+      "load_regime": "intermediate",
+      "policy_name": "fixed_interval",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 2503.1,
+        "sample_sd": 2503.386
+      },
+      "ttfs_p95_ms": {
+        "mean": 3347.723,
+        "sample_sd": 3083.255
+      },
+      "slo_attainment_pct": {
+        "mean": 11.113,
+        "sample_sd": 9.624
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 487.52,
+        "sample_sd": 797.635
+      },
+      "overall_draft_acceptance_rate": 0.04972919743968488
+    },
+    {
+      "load_regime": "intermediate",
+      "policy_name": "load_reuse_adaptive",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 807.053,
+        "sample_sd": 109.315
+      },
+      "ttfs_p95_ms": {
+        "mean": 1214.033,
+        "sample_sd": 113.384
+      },
+      "slo_attainment_pct": {
+        "mean": 8.33,
+        "sample_sd": 0.0
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 19.707,
+        "sample_sd": 2.593
+      },
+      "overall_draft_acceptance_rate": 0.11315789473684211
+    },
+    {
+      "load_regime": "intermediate",
+      "policy_name": "reuse_only",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 1064.237,
+        "sample_sd": 111.101
+      },
+      "ttfs_p95_ms": {
+        "mean": 1518.56,
+        "sample_sd": 123.577
+      },
+      "slo_attainment_pct": {
+        "mean": 16.67,
+        "sample_sd": 0.0
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 22.18,
+        "sample_sd": 3.868
+      },
+      "overall_draft_acceptance_rate": 0.06419098143236074
+    },
+    {
+      "load_regime": "heavy",
+      "policy_name": "no_draft",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 1073.803,
+        "sample_sd": 25.828
+      },
+      "ttfs_p95_ms": {
+        "mean": 1389.13,
+        "sample_sd": 95.591
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": 0.0
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 19.383,
+        "sample_sd": 4.353
+      },
+      "overall_draft_acceptance_rate": 0.0
+    },
+    {
+      "load_regime": "heavy",
+      "policy_name": "fixed_interval",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 1246.34,
+        "sample_sd": 6.905
+      },
+      "ttfs_p95_ms": {
+        "mean": 1782.753,
+        "sample_sd": 123.881
+      },
+      "slo_attainment_pct": {
+        "mean": 16.67,
+        "sample_sd": 0.0
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 30.693,
+        "sample_sd": 6.909
+      },
+      "overall_draft_acceptance_rate": 0.05558337506259389
+    },
+    {
+      "load_regime": "heavy",
+      "policy_name": "load_reuse_adaptive",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 1087.65,
+        "sample_sd": 43.749
+      },
+      "ttfs_p95_ms": {
+        "mean": 1373.08,
+        "sample_sd": 45.195
+      },
+      "slo_attainment_pct": {
+        "mean": 2.777,
+        "sample_sd": 4.809
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 23.93,
+        "sample_sd": 1.479
+      },
+      "overall_draft_acceptance_rate": 0.15048543689320387
+    },
+    {
+      "load_regime": "heavy",
+      "policy_name": "reuse_only",
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "num_runs": 3,
+      "evaluated_turns": 36,
+      "ttfs_p50_ms": {
+        "mean": 1259.35,
+        "sample_sd": 67.522
+      },
+      "ttfs_p95_ms": {
+        "mean": 1777.26,
+        "sample_sd": 201.273
+      },
+      "slo_attainment_pct": {
+        "mean": 13.89,
+        "sample_sd": 4.815
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 28.577,
+        "sample_sd": 6.107
+      },
+      "overall_draft_acceptance_rate": 0.06369426751592357
+    }
+  ]
+}

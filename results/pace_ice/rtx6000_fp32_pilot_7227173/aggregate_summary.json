@@ -1,0 +1,319 @@
+{
+  "source": "results/pace_ice/rtx6000_fp32_pilot_7227173/summaries_vllm_dev.json",
+  "output_validation": "passed",
+  "aggregation": "Mean and sample SD of per-seed run quantiles; not pooled turn quantiles. SD is null for one run.",
+  "groups": [
+    {
+      "load_regime": "light",
+      "policy_name": "no_draft",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 1882.34,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 3817.44,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 32.51,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.0
+    },
+    {
+      "load_regime": "light",
+      "policy_name": "fixed_interval",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 3543.42,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 5149.25,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 85.95,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.0931899641577061
+    },
+    {
+      "load_regime": "light",
+      "policy_name": "load_reuse_adaptive",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 1731.68,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 3984.41,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 53.25,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.0392156862745098
+    },
+    {
+      "load_regime": "light",
+      "policy_name": "reuse_only",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 3521.59,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 4978.58,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 84.44,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.09574468085106383
+    },
+    {
+      "load_regime": "intermediate",
+      "policy_name": "no_draft",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 8339.3,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 11638.68,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 3047.32,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.0
+    },
+    {
+      "load_regime": "intermediate",
+      "policy_name": "fixed_interval",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 8815.56,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 13191.72,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 3742.07,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.015151515151515152
+    },
+    {
+      "load_regime": "intermediate",
+      "policy_name": "load_reuse_adaptive",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 8408.91,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 11694.25,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 3050.63,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.0
+    },
+    {
+      "load_regime": "intermediate",
+      "policy_name": "reuse_only",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 8932.19,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 13135.29,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 3731.89,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.007936507936507936
+    },
+    {
+      "load_regime": "heavy",
+      "policy_name": "no_draft",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 9090.45,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 12315.08,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 3783.57,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.0
+    },
+    {
+      "load_regime": "heavy",
+      "policy_name": "fixed_interval",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 11322.84,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 14134.46,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 4871.57,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.01694915254237288
+    },
+    {
+      "load_regime": "heavy",
+      "policy_name": "load_reuse_adaptive",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 9187.94,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 12342.57,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 3809.03,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.25
+    },
+    {
+      "load_regime": "heavy",
+      "policy_name": "reuse_only",
+      "seeds": [
+        1
+      ],
+      "num_runs": 1,
+      "evaluated_turns": 12,
+      "ttfs_p50_ms": {
+        "mean": 11296.55,
+        "sample_sd": null
+      },
+      "ttfs_p95_ms": {
+        "mean": 14108.22,
+        "sample_sd": null
+      },
+      "slo_attainment_pct": {
+        "mean": 0.0,
+        "sample_sd": null
+      },
+      "mean_p0_queue_wait_ms": {
+        "mean": 4869.3,
+        "sample_sd": null
+      },
+      "overall_draft_acceptance_rate": 0.01694915254237288
+    }
+  ]
+}

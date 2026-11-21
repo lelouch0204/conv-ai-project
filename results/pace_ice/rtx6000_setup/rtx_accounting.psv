@@ -1,0 +1,7 @@
+JobIDRaw|State|ElapsedRaw|ExitCode|AllocTRES|NodeList
+7226325|COMPLETED|81|0:0|billing=2,cpu=2,gres/gpu:rtx_6000=1,gres/gpu=1,mem=8G,node=1|atl1-1-01-005-5-0
+7226385|COMPLETED|359|0:0|billing=4,cpu=4,gres/gpu:rtx_6000=1,gres/gpu=1,mem=32G,node=1|atl1-1-01-005-5-0
+7226493|FAILED|888|1:0|billing=4,cpu=4,gres/gpu:rtx_6000=1,gres/gpu=1,mem=32G,node=1|atl1-1-01-005-5-0
+7226802|COMPLETED|276|0:0|billing=4,cpu=4,gres/gpu:rtx_6000=1,gres/gpu=1,mem=32G,node=1|atl1-1-01-005-5-0
+7226964|COMPLETED|391|0:0|billing=4,cpu=4,gres/gpu:rtx_6000=1,gres/gpu=1,mem=32G,node=1|atl1-1-01-005-5-0
+7227173|COMPLETED|584|0:0|billing=4,cpu=4,gres/gpu:rtx_6000=1,gres/gpu=1,mem=32G,node=1|atl1-1-01-005-5-0
