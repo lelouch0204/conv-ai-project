@@ -81,6 +81,16 @@ request to match the cluster allocation. After correctness checks pass, expand:
 TARGET_TURNS=48 WARMUP_TURNS=6 SEEDS=1,2,3 sbatch scripts/run_pilot.sbatch
 ```
 
+The script uses the submitting account's `~/scratch/.cache` for caches and
+preserves explicitly supplied `HF_HOME`, `UV_CACHE_DIR`, and `XDG_CACHE_HOME`.
+Override `PACE_CACHE_ROOT` for another scratch location or `PROJECT_DIR` when
+submitting outside the checkout. Its default `HF_HUB_OFFLINE=1` requires the model
+to be downloaded into that account's cache before the job starts; set
+`HF_HUB_OFFLINE=0` explicitly only when downloads are intended. Load the prepared
+Python environment and ensure `uv` is on `PATH` before submitting.
+Set `MODEL_REVISION` to pin both model and tokenizer for batch jobs; `MODEL_NAME`
+can select another checkpoint. Both values are passed to the experiment runner.
+
 Model and tokenizer revisions can be pinned with the runner's
 `--model_revision`; if omitted, the model name alone does not identify immutable
 weights. `--max_new_tokens` defaults to 48. On supported configurations, consult

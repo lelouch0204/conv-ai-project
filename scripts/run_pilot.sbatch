@@ -12,10 +12,20 @@
 
 set -euo pipefail
 
-cd "${SLURM_SUBMIT_DIR:-/home/hice1/nparikh44/scratch/conv-ai-project}"
+PROJECT_DIR="${PROJECT_DIR:-${SLURM_SUBMIT_DIR:-$PWD}}"
+cd "${PROJECT_DIR}"
+if [[ ! -f pyproject.toml || ! -f scripts/run_experiment.py ]]; then
+  echo "Submit from the repository root or set PROJECT_DIR to the checkout." >&2
+  exit 2
+fi
 
 GPU_TAG="${GPU_TAG:-rtx_6000}"
 DTYPE="${DTYPE:-float16}"
+MODEL_NAME="${MODEL_NAME:-microsoft/Phi-4-mini-instruct}"
+MODEL_ARGS=(--model_name "${MODEL_NAME}")
+if [[ -n "${MODEL_REVISION:-}" ]]; then
+  MODEL_ARGS+=(--model_revision "${MODEL_REVISION}")
+fi
 LOADS="${LOADS:-light,intermediate,heavy}"
 TARGET_TURNS="${TARGET_TURNS:-16}"
 WARMUP_TURNS="${WARMUP_TURNS:-4}"
@@ -25,19 +35,22 @@ OUT_DIR="${OUT_DIR:-results/${GPU_TAG}/run-${SLURM_JOB_ID:-local}}"
 
 mkdir -p results "${OUT_DIR}"
 
+PACE_CACHE_ROOT="${PACE_CACHE_ROOT:-${HOME}/scratch/.cache}"
 export PATH="$HOME/.local/bin:$PATH"
-export XDG_CACHE_HOME="/home/hice1/nparikh44/scratch/.cache/${GPU_TAG}"
-export UV_CACHE_DIR=/home/hice1/nparikh44/scratch/.cache/uv
-export HF_HOME=/home/hice1/nparikh44/scratch/.cache/huggingface
-export HF_HUB_OFFLINE=1
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${PACE_CACHE_ROOT}/${GPU_TAG}}"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-${PACE_CACHE_ROOT}/uv}"
+export HF_HOME="${HF_HOME:-${PACE_CACHE_ROOT}/huggingface}"
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 export PYTHONUNBUFFERED=1
+
+mkdir -p "${XDG_CACHE_HOME}" "${UV_CACHE_DIR}" "${HF_HOME}"
 
 echo "Host: $(hostname)"
 nvidia-smi --query-gpu=name,memory.total,compute_cap --format=csv,noheader
 
 uv run --no-sync python scripts/run_experiment.py \
   --mode vllm \
-  --model_name microsoft/Phi-4-mini-instruct \
+  "${MODEL_ARGS[@]}" \
   --dtype "${DTYPE}" \
   --split dev \
   --policies "${POLICIES}" \
