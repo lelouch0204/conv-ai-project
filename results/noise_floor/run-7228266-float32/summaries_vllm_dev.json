@@ -1,0 +1,90 @@
+[
+  {
+    "policy_name": "no_draft",
+    "load_regime": "light",
+    "arrival_rate_rps": 0.25,
+    "seed": 1,
+    "num_turns": 12,
+    "warmup_turns": 4,
+    "ttfs_p50_ms": 259.96,
+    "ttfs_p95_ms": 340.14,
+    "ttfs_mean_ms": 257.26,
+    "ttft_p50_ms": 14.19,
+    "ttft_p95_ms": 18.25,
+    "slo_target_ms": 190.0,
+    "slo_attainment_pct": 16.67,
+    "goodput_turns_per_sec": 0.063,
+    "goodput_tokens_per_sec": 15.68,
+    "total_drafted_tokens": 0,
+    "total_accepted_tokens": 0,
+    "total_canceled_tokens": 0,
+    "mean_acceptance_rate": 0.0,
+    "mean_p0_queue_wait_ms": 0.0,
+    "timeout_count": 0,
+    "total_sim_duration_ms": 31880.33,
+    "by_family": {
+      "correction": {
+        "count": 1.0,
+        "ttfs_p50_ms": 226.35,
+        "ttfs_p95_ms": 226.35,
+        "acceptance_rate": 0.0
+      },
+      "daily": {
+        "count": 7.0,
+        "ttfs_p50_ms": 258.78,
+        "ttfs_p95_ms": 335.19,
+        "acceptance_rate": 0.0
+      },
+      "entity_tracking": {
+        "count": 4.0,
+        "ttfs_p50_ms": 281.52,
+        "ttfs_p95_ms": 335.16,
+        "acceptance_rate": 0.0
+      }
+    }
+  },
+  {
+    "policy_name": "no_draft",
+    "load_regime": "heavy",
+    "arrival_rate_rps": 4.2,
+    "seed": 1,
+    "num_turns": 12,
+    "warmup_turns": 4,
+    "ttfs_p50_ms": 380.41,
+    "ttfs_p95_ms": 532.22,
+    "ttfs_mean_ms": 361.85,
+    "ttft_p50_ms": 15.83,
+    "ttft_p95_ms": 33.33,
+    "slo_target_ms": 190.0,
+    "slo_attainment_pct": 8.33,
+    "goodput_turns_per_sec": 0.096,
+    "goodput_tokens_per_sec": 46.9,
+    "total_drafted_tokens": 0,
+    "total_accepted_tokens": 0,
+    "total_canceled_tokens": 0,
+    "mean_acceptance_rate": 0.0,
+    "mean_p0_queue_wait_ms": 5.4,
+    "timeout_count": 0,
+    "total_sim_duration_ms": 10405.88,
+    "by_family": {
+      "correction": {
+        "count": 3.0,
+        "ttfs_p50_ms": 320.17,
+        "ttfs_p95_ms": 428.59,
+        "acceptance_rate": 0.0
+      },
+      "daily": {
+        "count": 5.0,
+        "ttfs_p50_ms": 455.16,
+        "ttfs_p95_ms": 499.09,
+        "acceptance_rate": 0.0
+      },
+      "entity_tracking": {
+        "count": 4.0,
+        "ttfs_p50_ms": 373.93,
+        "ttfs_p95_ms": 553.22,
+        "acceptance_rate": 0.0
+      }
+    }
+  }
+]

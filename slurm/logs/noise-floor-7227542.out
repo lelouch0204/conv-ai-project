@@ -1,0 +1,28 @@
+---------------------------------------
+Begin Slurm Prolog: Nov-21-2026 14:28:25
+Job ID:    7227542
+User ID:   vsundar31
+Account:   coc
+Job name:  noise-floor
+Partition: coe-gpu
+QOS:       coe-ice
+---------------------------------------
+Host: atl1-1-03-011-28-0.pace.gatech.edu  Job: 7227542  dtype: bfloat16
+NVIDIA H100 80GB HBM3, 81559 MiB, 615.71.09
+Loaded 16 traces from /storage/ice1/6/8/vsundar31/conv-ai-project/data/fdb_v2_sample/dev.jsonl
+Loading VLLMEngine (microsoft/Phi-4-mini-instruct, dtype=bfloat16) ...
+
+Runner exit code: 1 (0 = validated, nonzero = mismatches or crash)
+Artifacts in: results/noise_floor/run-7227542-bfloat16
+---------------------------------------
+Begin Slurm Epilog: Nov-21-2026 14:30:16
+Job ID:        7227542
+User ID:       vsundar31
+Account:       coc
+Job name:      noise-floor
+Resources:     cpu=8,gres/gpu:h100=1,mem=32G,node=1
+Rsrc Used:     cput=00:14:48,vmem=0,walltime=00:01:51,mem=1568900K,energy_used=0
+Partition:     coe-gpu
+QOS:           coe-ice
+Nodes:         atl1-1-03-011-28-0
+---------------------------------------
