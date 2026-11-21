@@ -43,6 +43,7 @@ class TurnMetrics:
     timed_out: bool
     is_warmup: bool
     response_text: str
+    response_tokens: List[Any]
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -101,6 +102,8 @@ class ReplayHarness:
         self.warmup_turns = max(0, int(warmup_turns))
         self.record_timeline = bool(record_timeline)
         self.last_timeline: List[Dict[str, Any]] = []
+        if self.max_batch_size < 1 or self.max_new_tokens < 1:
+            raise ValueError("max_batch_size and max_new_tokens must be positive")
 
     def run(
         self,
@@ -118,6 +121,21 @@ class ReplayHarness:
             max_new_tokens=self.max_new_tokens,
             record_trace=self.record_timeline,
         )
+
+        # Select once from the offered workload, never from policy-dependent
+        # completion order. Final-arrival order is identical across paired runs.
+        ordered_turns = sorted(
+            schedule,
+            key=lambda ev: (
+                ev.utterance_start_ms + ev.trace.final.offset_ms,
+                ev.stream_conversation_id,
+                ev.trace.turn_id,
+            ),
+        )
+        turn_keys = [(ev.stream_conversation_id, ev.trace.turn_id) for ev in ordered_turns]
+        if len(set(turn_keys)) != len(turn_keys):
+            raise ValueError("Workload contains duplicate conversation/turn identities")
+        warmup_keys = set(turn_keys[:self.warmup_turns])
 
         # Build min-heap of (event_time_ms, seq_id, event_kind, payload)
         event_heap: List[Tuple[float, int, str, Dict[str, Any]]] = []
@@ -221,7 +239,7 @@ class ReplayHarness:
             self.last_timeline = []
 
         turn_metrics: List[TurnMetrics] = []
-        for idx, rec in enumerate(completions):
+        for rec in completions:
             turn_metrics.append(
                 TurnMetrics(
                     policy_name=controller.name,
@@ -244,8 +262,9 @@ class ReplayHarness:
                     canceled_tokens=rec.canceled_tokens,
                     acceptance_rate=rec.acceptance_rate,
                     timed_out=rec.ttfs_ms > self.timeout_ms,
-                    is_warmup=idx < self.warmup_turns,
+                    is_warmup=(rec.conversation_id, rec.turn_id) in warmup_keys,
                     response_text=rec.response_text,
+                    response_tokens=list(rec.response_tokens),
                 )
             )
 
@@ -268,14 +287,14 @@ class ReplayHarness:
         arrival_rate_rps: float,
         seed: int,
     ) -> RunSummary:
-        if not metrics:
+        if not metrics or all(m.is_warmup for m in metrics):
             return RunSummary(
                 policy_name=policy_name,
                 load_regime=load_regime,
                 arrival_rate_rps=arrival_rate_rps,
                 seed=seed,
                 num_turns=0,
-                warmup_turns=0,
+                warmup_turns=sum(m.is_warmup for m in metrics),
                 ttfs_p50_ms=0.0,
                 ttfs_p95_ms=0.0,
                 ttfs_mean_ms=0.0,
@@ -298,12 +317,8 @@ class ReplayHarness:
         steady_pairs = [
             (c, m) for c, m in zip(completions, metrics) if not m.is_warmup
         ]
-        if steady_pairs:
-            eval_completions = [c for c, _ in steady_pairs]
-            eval_metrics = [m for _, m in steady_pairs]
-        else:
-            eval_completions = list(completions)
-            eval_metrics = list(metrics)
+        eval_completions = [c for c, _ in steady_pairs]
+        eval_metrics = [m for _, m in steady_pairs]
 
         warmup_count = sum(1 for m in metrics if m.is_warmup)
         ttfs_arr = np.array([m.ttfs_ms for m in eval_metrics], dtype=float)

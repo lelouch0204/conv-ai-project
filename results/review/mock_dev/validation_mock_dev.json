@@ -1,0 +1,15 @@
+{
+  "turn_rows": 1728,
+  "paired_comparisons": 1296,
+  "token_comparisons": 1296,
+  "text_only_comparisons": 0,
+  "output_mismatches": [],
+  "warmup_mismatches": [],
+  "accounting_errors": [],
+  "duplicate_turns": [],
+  "missing_pairs": [],
+  "artifact_consistent": true,
+  "greedy_reference_status": "passed",
+  "reference_checked_turns": 1728,
+  "reference_mismatches": []
+}

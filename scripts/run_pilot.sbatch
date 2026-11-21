@@ -12,14 +12,16 @@
 
 set -euo pipefail
 
-cd /home/hice1/nparikh44/scratch/conv-ai-project
+cd "${SLURM_SUBMIT_DIR:-/home/hice1/nparikh44/scratch/conv-ai-project}"
 
 GPU_TAG="${GPU_TAG:-rtx_6000}"
 DTYPE="${DTYPE:-float16}"
 LOADS="${LOADS:-light,intermediate,heavy}"
 TARGET_TURNS="${TARGET_TURNS:-16}"
 WARMUP_TURNS="${WARMUP_TURNS:-4}"
-OUT_DIR="${OUT_DIR:-results/${GPU_TAG}}"
+POLICIES="${POLICIES:-no_draft,fixed_interval,load_reuse_adaptive,reuse_only}"
+SEEDS="${SEEDS:-1}"
+OUT_DIR="${OUT_DIR:-results/${GPU_TAG}/run-${SLURM_JOB_ID:-local}}"
 
 mkdir -p results "${OUT_DIR}"
 
@@ -38,9 +40,9 @@ uv run --no-sync python scripts/run_experiment.py \
   --model_name microsoft/Phi-4-mini-instruct \
   --dtype "${DTYPE}" \
   --split dev \
-  --policies no_draft,fixed_interval \
+  --policies "${POLICIES}" \
   --loads "${LOADS}" \
-  --seeds 1 \
+  --seeds "${SEEDS}" \
   --target_turns "${TARGET_TURNS}" \
   --warmup_turns "${WARMUP_TURNS}" \
   --output_dir "${OUT_DIR}"

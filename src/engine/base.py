@@ -97,6 +97,10 @@ class BaseLLMEngine:
         """Optional kernel/allocator warmup called once before running benchmarks."""
         return None
 
+    def reset_prefix_cache(self) -> None:
+        """Clear request-derived caches between paired runs (no-op without caches)."""
+        return None
+
     def prefill_prompt(
         self,
         request_id: str,

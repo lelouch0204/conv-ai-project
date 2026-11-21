@@ -1,4 +1,9 @@
-"""vLLM serving engine using PagedAttention, prefix caching, and prompt_logprobs verification."""
+"""Stepwise vLLM replay backend; each step is a completed one-token request.
+
+This uses prefix caching, not persistent vLLM decode requests. Prompt scoring and
+generation can differ numerically on hardware; validate complete outputs before
+interpreting a run as a greedy-equivalent latency comparison.
+"""
 
 from __future__ import annotations
 
@@ -30,6 +35,7 @@ class VLLMEngine(BaseLLMEngine):
         max_model_len: int = 4096,
         llm: Any = None,
         sampling_params_cls: Any = None,
+        revision: Optional[str] = None,
     ) -> None:
         if llm is None or sampling_params_cls is None:
             from vllm import LLM, SamplingParams
@@ -43,6 +49,9 @@ class VLLMEngine(BaseLLMEngine):
                     enable_prefix_caching=True,
                     gpu_memory_utilization=gpu_memory_utilization,
                     max_model_len=max_model_len,
+                    revision=revision,
+                    tokenizer_revision=revision,
+                    generation_config="vllm",
                 )
 
         self.llm = llm
@@ -50,6 +59,30 @@ class VLLMEngine(BaseLLMEngine):
         self.tokenizer = self.llm.get_tokenizer()
         self.eos_token_id = getattr(self.tokenizer, "eos_token_id", None)
         self.stop_token_ids: Set[int] = self._collect_stop_token_ids()
+
+    def _greedy_params(self, max_tokens: int, **kwargs: Any) -> Any:
+        """Keep sampling identical to raw argmax prompt scoring."""
+        return self._sampling_params_cls(
+            temperature=0.0,
+            top_p=1.0,
+            top_k=-1,
+            min_p=0.0,
+            repetition_penalty=1.0,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+            stop_token_ids=sorted(self.stop_token_ids),
+            max_tokens=max_tokens,
+            **kwargs,
+        )
+
+    def reset_prefix_cache(self) -> None:
+        reset = getattr(self.llm, "reset_prefix_cache", None)
+        if reset is None:
+            reset = getattr(getattr(self.llm, "llm_engine", None), "reset_prefix_cache", None)
+        if reset is None:
+            raise RuntimeError("This vLLM version cannot reset prefix caches for paired runs.")
+        if reset() is False:
+            raise RuntimeError("vLLM prefix cache reset failed; refusing a cache-biased run.")
 
     def _collect_stop_token_ids(self) -> Set[int]:
         stop_ids: Set[int] = set()
@@ -110,11 +143,9 @@ class VLLMEngine(BaseLLMEngine):
         for tok_id, info in logprob_entry.items():
             if getattr(info, "rank", None) == 1:
                 return int(tok_id)
-        best_tok = max(
-            logprob_entry.items(),
-            key=lambda kv: getattr(kv[1], "logprob", kv[1]),
-        )[0]
-        return int(best_tok)
+        # A candidate's own logprob can be present without the actual top token.
+        # Do not interpret a truncated or malformed entry as proof of argmax.
+        return None
 
     def warmup(self, num_passes: int = 2) -> None:
         """Warm up vLLM CUDA graphs, prefix cache, and batched decode path."""
@@ -142,8 +173,10 @@ class VLLMEngine(BaseLLMEngine):
         is_foreground: bool,
         max_new_tokens: int = 48,
     ) -> Tuple[ActiveSequenceState, float]:
+        if max_new_tokens < 1:
+            raise ValueError("max_new_tokens must be positive")
         prompt_ids = self._format_prompt_ids(history, text)
-        params = self._sampling_params_cls(temperature=0.0, max_tokens=1)
+        params = self._greedy_params(max_tokens=1)
         outputs, elapsed_ms = self._timed_generate([{"prompt_token_ids": prompt_ids}], params)
 
         out_toks = outputs[0].outputs[0].token_ids
@@ -173,15 +206,14 @@ class VLLMEngine(BaseLLMEngine):
         draft_tokens: Sequence[Any],
         max_new_tokens: int = 48,
     ) -> Tuple[VerificationResult, ActiveSequenceState]:
+        if max_new_tokens < 1:
+            raise ValueError("max_new_tokens must be positive")
         prompt_ids = self._format_prompt_ids(history, final_text)
-        draft_ids = [int(t) for t in draft_tokens]
+        all_draft_ids = [int(t) for t in draft_tokens]
+        draft_ids = all_draft_ids[:max_new_tokens]
         full_ids = prompt_ids + draft_ids
 
-        params = self._sampling_params_cls(
-            temperature=0.0,
-            max_tokens=1,
-            prompt_logprobs=1,
-        )
+        params = self._greedy_params(max_tokens=1, prompt_logprobs=1)
         outputs, elapsed_ms = self._timed_generate([{"prompt_token_ids": full_ids}], params)
         req_out = outputs[0]
 
@@ -194,11 +226,12 @@ class VLLMEngine(BaseLLMEngine):
             pos = prompt_len + idx
             lp_entry = prompt_lps[pos] if pos < len(prompt_lps) else None
             greedy_tok = self._extract_greedy_prompt_token(lp_entry)
-            if (
-                greedy_tok is not None
-                and d_tok == greedy_tok
-                and d_tok not in self.stop_token_ids
-            ):
+            if greedy_tok is None:
+                raise RuntimeError(
+                    f"Missing rank-1 prompt logprob at draft position {idx}; "
+                    "cannot safely verify this draft."
+                )
+            if d_tok == greedy_tok and d_tok not in self.stop_token_ids:
                 accepted_count += 1
             else:
                 mismatched_greedy = greedy_tok
@@ -206,8 +239,11 @@ class VLLMEngine(BaseLLMEngine):
 
         accepted_tokens = draft_ids[:accepted_count]
         out_toks = req_out.outputs[0].token_ids
-        if accepted_count < len(draft_ids) and mismatched_greedy is not None:
-            bonus_raw: Optional[int] = mismatched_greedy
+        bonus_raw: Optional[int]
+        if accepted_count >= max_new_tokens:
+            bonus_raw = None
+        elif accepted_count < len(draft_ids):
+            bonus_raw = mismatched_greedy
         else:
             bonus_raw = int(out_toks[0]) if out_toks else None
 
@@ -233,7 +269,7 @@ class VLLMEngine(BaseLLMEngine):
             accepted_tokens=accepted_tokens,
             bonus_token=bonus_token,
             accepted_count=accepted_count,
-            drafted_count=len(draft_ids),
+            drafted_count=len(all_draft_ids),
             prefill_time_ms=elapsed_ms,
         )
         return ver_res, state
@@ -258,7 +294,7 @@ class VLLMEngine(BaseLLMEngine):
             return emitted, 0.0
 
         prompts = [{"prompt_token_ids": seq.backend_state.context_ids} for _, seq in live]
-        params = self._sampling_params_cls(temperature=0.0, max_tokens=1)
+        params = self._greedy_params(max_tokens=1)
         outputs, elapsed_ms = self._timed_generate(prompts, params)
 
         for (orig_idx, seq), out in zip(live, outputs):
@@ -291,7 +327,9 @@ class VLLMEngine(BaseLLMEngine):
         max_new_tokens: int = 48,
     ) -> List[Any]:
         prompt_ids = self._format_prompt_ids(history, final_text)
-        params = self._sampling_params_cls(temperature=0.0, max_tokens=max_new_tokens)
+        if max_new_tokens < 1:
+            raise ValueError("max_new_tokens must be positive")
+        params = self._greedy_params(max_tokens=max_new_tokens)
         outputs, _ = self._timed_generate([{"prompt_token_ids": prompt_ids}], params)
         gen_ids = [int(t) for t in outputs[0].outputs[0].token_ids]
         for idx, tok in enumerate(gen_ids):

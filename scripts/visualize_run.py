@@ -399,7 +399,7 @@ def _derive_summary(
     slo_target_ms: float,
 ) -> Dict[str, Any]:
     steady = [t for t in turns if not t["is_warmup"]]
-    eval_turns = steady if steady else list(turns)
+    eval_turns = steady
     warmup_count = sum(1 for t in turns if t["is_warmup"])
     if not eval_turns:
         return {
@@ -650,7 +650,7 @@ def format_ascii_report(payload: Dict[str, Any], width: int = 72) -> str:
             run = grp["policies"][policy_name]
             s = run["summary"]
             agg = run["aggregates"]
-            mode_tag = "Full Timeline (P0+P1)" if run["has_timeline"] else "Turn-Only (P0 exact)"
+            mode_tag = "Full Timeline (P0+P1)" if run["has_timeline"] else "Turn-Only (P0 envelope estimate)"
 
             lines.append("=" * 88)
             lines.append(
@@ -660,7 +660,7 @@ def format_ascii_report(payload: Dict[str, Any], width: int = 72) -> str:
             lines.append(
                 f"TTFS p50={s['ttfs_p50_ms']}ms  p95={s['ttfs_p95_ms']}ms  mean={s['ttfs_mean_ms']}ms | "
                 f"SLO(<={slo_ms:.0f}ms)={s['slo_attainment_pct']}% | "
-                f"AvgGPU={agg['avg_gpu_util_pct']}% (P0={agg['avg_p0_util_pct']}%, P1={agg['avg_p1_util_pct']}%) | "
+                f"AvgBusy={agg['avg_gpu_util_pct']}% (P0={agg['avg_p0_util_pct']}%, P1={agg['avg_p1_util_pct']}%) | "
                 f"Acc={s['total_accepted_tokens']}/{s['total_drafted_tokens']} (Can={s['total_canceled_tokens']})"
             )
             lines.append(
@@ -694,7 +694,7 @@ def format_ascii_report(payload: Dict[str, Any], width: int = 72) -> str:
                         peak_u = max(peak_u, float(b["total_gpu_busy_pct"]))
                 level = min(len(_ASCII_SPARK) - 1, int(round(peak_u / 100.0 * (len(_ASCII_SPARK) - 1))))
                 spark_chars.append(_ASCII_SPARK[level])
-            lines.append(f"{'GPU Util% (peak/col)':<22} |{''.join(spark_chars)}|")
+            lines.append(f"{'Busy proxy (peak/col)':<22} |{''.join(spark_chars)}|")
             lines.append(f"{'Time (0 -> ' + f'{t_max_ms/1000:.1f}s)':<22}  {'0s':<{width - 6}}{t_max_ms/1000:>5.1f}s")
             lines.append("")
             lines.append(
@@ -977,7 +977,7 @@ tr.selected { background: rgba(59, 130, 246, 0.22); }
 
 <div class="panel">
   <div class="panel-hdr">
-    <span class="panel-title">GPU Utilization &amp; Concurrency Over Time</span>
+    <span class="panel-title">Scheduled Occupancy &amp; Concurrency Over Time</span>
     <div class="legend">
       <span class="leg-item"><span class="swatch" style="background:rgba(16,185,129,0.55)"></span>P0 GPU %</span>
       <span class="leg-item"><span class="swatch" style="background:rgba(168,85,247,0.55)"></span>P1 Draft GPU %</span>
@@ -1293,7 +1293,7 @@ tr.selected { background: rgba(59, 130, 246, 0.22); }
         <div class="card-sub">${doneCount} / ${run.turns.length} turns completed · ${g.users.length} streams</div>
       </div>
       <div class="card">
-        <div class="card-title">GPU Utilization</div>
+        <div class="card-title">Scheduled Occupancy Proxy</div>
         <div class="card-val mono">${instGpu}% <span style="font-size:12px;color:var(--muted);">now</span> · ${run.aggregates.avg_gpu_util_pct.toFixed(1)}% <span style="font-size:12px;color:var(--muted);">avg</span></div>
         <div class="card-sub">Bin P0=${instP0}% P1=${instP1}% · peak batch ${batchNow}/${g.max_batch_size}</div>
       </div>
@@ -1784,10 +1784,10 @@ tr.selected { background: rgba(59, 130, 246, 0.22); }
     els.rngTime.value = String(Math.round(state.tMs));
     if (run.has_timeline) {
       els.badge.className = "badge full";
-      els.badge.textContent = "FULL TIMELINE MODE (Exact P0 + P1 GPU steps)";
+      els.badge.textContent = "FULL TIMELINE MODE (Timed calls; P0/P1 split estimated by sequence count)";
     } else {
       els.badge.className = "badge turn";
-      els.badge.textContent = "TURN-ONLY MODE (Exact P0 GPU occupancy; P1 steps omitted in older runs)";
+      els.badge.textContent = "TURN-ONLY MODE (Foreground response envelopes; GPU occupancy estimated)";
     }
   }
 
@@ -1894,7 +1894,7 @@ tr.selected { background: rgba(59, 130, 246, 0.22); }
         const b = findBinAt(curRun(), tHover);
         if (b) {
           showTip(e, `<b>Window ${(b.t0/1000).toFixed(2)}s - ${(b.t1/1000).toFixed(2)}s</b><br>` +
-            `Total GPU Busy: <b>${b.total_gpu_busy_pct.toFixed(1)}%</b> (P0 ${b.p0_util_pct.toFixed(1)}%, P1 ${b.p1_util_pct.toFixed(1)}%)<br>` +
+            `Scheduled Busy Proxy: <b>${b.total_gpu_busy_pct.toFixed(1)}%</b> (P0 ${b.p0_util_pct.toFixed(1)}%, P1 ${b.p1_util_pct.toFixed(1)}%)<br>` +
             `Peak Speakers: ${b.active_speakers} · Batch: ${b.max_batch_p0}+${b.max_batch_p1} · Queue: ${b.max_queue_p0}`);
         }
       } else if (kind === "lat") {
@@ -2033,7 +2033,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     if timeline_path:
         print(f"Loaded step-level GPU timeline:        {timeline_path}")
     else:
-        print("Timeline JSONL not found; rendered turn-only mode (exact P0 occupancy).")
+        print("Timeline JSONL not found; rendered turn-only mode (foreground envelope estimate).")
 
 
 if __name__ == "__main__":
